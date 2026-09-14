@@ -1,0 +1,32 @@
+settings:
+
+  argument-literal: punish
+
+types:
+
+  kick:
+
+    animation:
+      need-to-select-in-command: true
+      selected: holyworld
+
+    actions:
+      - 'kick {player.name} {context.input-after-type}'
+
+  ban:
+
+    animation:
+      need-to-select-in-command: false
+      selected: holyworld
+
+    actions:
+      - 'ban {player.name} {context.input-after-type}'
+
+  mute:
+
+    animation:
+      need-to-select-in-command: true
+      selected: holyworld
+
+    actions:
+      - 'mute {player.name} {context.input-after-type}'

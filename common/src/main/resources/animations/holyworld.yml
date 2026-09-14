@@ -1,0 +1,17 @@
+particle-count: 32
+
+radius: 1.0
+
+vertical-offset: 0.0
+
+rotation-speed: 3.0
+
+z-rotation: 45.0
+
+random-offset: 0.02
+
+dust-size: 1.5
+
+color-1: '#FFFFFF'
+
+color-2: '#3DC0FF'
