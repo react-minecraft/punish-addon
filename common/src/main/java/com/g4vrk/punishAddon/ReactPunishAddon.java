@@ -2,8 +2,6 @@ package com.g4vrk.punishAddon;
 
 import com.g4vrk.functionalActions.ExecutableAction;
 import com.g4vrk.functionalActions.parser.ActionParser;
-import com.g4vrk.functionalConfiguration.Config;
-import com.g4vrk.functionalConfiguration.loader.YamlConfigLoader;
 import com.g4vrk.punishAddon.command.argument.PunishArgument;
 import com.g4vrk.punishAddon.config.AnimationSettings;
 import com.g4vrk.punishAddon.config.PunishType;
@@ -12,7 +10,7 @@ import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
 import com.g4vrk.react.React;
-import com.g4vrk.react.api.Factory;
+import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.react.api.addon.JavaAddon;
 import com.g4vrk.schedula.task.TickSchedule;
 import net.kyori.adventure.audience.Audience;
@@ -21,11 +19,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
-import org.incendo.cloud.Command;
 import org.incendo.cloud.bukkit.data.MultiplePlayerSelector;
 import org.incendo.cloud.context.CommandContext;
 import org.jetbrains.annotations.NotNull;
+import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 import org.spongepowered.configurate.serialize.SerializationException;
 
 import java.io.IOException;
@@ -44,8 +43,8 @@ public final class ReactPunishAddon extends JavaAddon {
 
     private volatile PendingActionManager pendingActionManager;
 
-    private volatile Config mainConfig;
-    private volatile Config holyWorldConfig;
+    private volatile CommentedConfigurationNode mainConfig;
+    private volatile CommentedConfigurationNode holyWorldConfig;
 
     private volatile Map<String, Sequence<Player>> animations;
 
@@ -68,16 +67,11 @@ public final class ReactPunishAddon extends JavaAddon {
 
         final React react = React.INSTANCE;
 
-        final Factory<Command.Builder<CommandSender>> builderFactory =
-                () -> react
-                        .getCommandBuilderFactory()
-                        .create();
-
         this.pendingActionManager = new PendingActionManager();
 
         this.listener = new JoinListener(pendingActionManager::thenJoin);
 
-        final Plugin pluginInstance = React.INSTANCE.getPlugin();
+        final Plugin pluginInstance = react.plugin();
 
         pluginInstance.getServer().getPluginManager().registerEvents(this.listener, pluginInstance);
 
@@ -85,7 +79,7 @@ public final class ReactPunishAddon extends JavaAddon {
 
         final PunishArgument punishArgument =
                 new PunishArgument(
-                        builderFactory,
+                        react.commands().builderFactory(),
                         this.mainConfig
                                 .node("settings", "argument-literal")
                                 .getString("menu"),
@@ -94,7 +88,7 @@ public final class ReactPunishAddon extends JavaAddon {
                 );
 
         punishArgument.register(
-                react.getCommandManager()
+                react.commands().manager()
         );
 
         slf4jLogger().info(
@@ -187,7 +181,10 @@ public final class ReactPunishAddon extends JavaAddon {
 
     @Override
     public void onDisable() {
-        HandlerList.unregisterAll();
+        if (this.listener != null) {
+            HandlerList.unregisterAll(this.listener);
+            this.listener = null;
+        }
         slf4jLogger().info(
                 "ReactPunishAddon successfully disabled!"
         );
@@ -210,7 +207,7 @@ public final class ReactPunishAddon extends JavaAddon {
                     final CompletableFuture<Void> future =
                             new CompletableFuture<>();
 
-                    React.INSTANCE.getScheduler().schedule(
+                    React.INSTANCE.scheduler().schedule(
                             () -> {
                                 try {
                                     future.complete(null);
@@ -239,26 +236,23 @@ public final class ReactPunishAddon extends JavaAddon {
                 );
     }
 
-    public @NotNull Config getMainConfig() {
+    public @NotNull ConfigurationNode mainConfig() {
         return this.mainConfig;
     }
 
-    public @NotNull Config getHolyWorldConfig() {
+    public @NotNull ConfigurationNode holyWorldConfig() {
         return this.holyWorldConfig;
     }
 
-    public @NotNull Map<String, Sequence<Player>> getAnimations() {
+    public @NotNull Map<String, Sequence<Player>> animations() {
         return this.animations;
     }
 
-    public @NotNull Map<String, PunishType> getTypes() {
+    public @NotNull Map<String, PunishType> types() {
         return this.types;
     }
 
     private void loadConfigurableModules() {
-
-        final YamlConfigLoader configLoader =
-                new YamlConfigLoader();
 
         final Path mainConfigPath =
                 directory()
@@ -270,12 +264,12 @@ public final class ReactPunishAddon extends JavaAddon {
                         .toPath()
                         .resolve("animations/holyworld.yml");
 
-        final Config config;
-        final Config holyWorldConfig;
+        final CommentedConfigurationNode config;
+        final CommentedConfigurationNode holyWorldConfig;
 
         try {
-            config = configLoader.from(mainConfigPath);
-            holyWorldConfig = configLoader.from(holyWorldConfigPath);
+            config = load(mainConfigPath);
+            holyWorldConfig = load(holyWorldConfigPath);
         } catch (final IOException exception) {
             throw new RuntimeException(
                     "Failed to load configs",
@@ -286,11 +280,16 @@ public final class ReactPunishAddon extends JavaAddon {
         this.mainConfig = config;
         this.holyWorldConfig = holyWorldConfig;
 
-        final Map<String, Sequence<Player>> animations =
-                BuiltInSequenceBootstrap.bootstrap(this.pendingActionManager);
+        final Map<String, Sequence<Player>> animations;
+        if (this.animations == null) {
+            animations = BuiltInSequenceBootstrap.bootstrap(this.pendingActionManager);
+        } else {
+            animations = this.animations;
+            this.reloadAnimations(animations, holyWorldConfig);
+        }
 
         final ActionParser<Audience> actionParser =
-                React.INSTANCE.getActionParser();
+                React.INSTANCE.actionParser();
 
         final Map<String, PunishType> types;
 
@@ -383,6 +382,26 @@ public final class ReactPunishAddon extends JavaAddon {
         }
 
         return Map.copyOf(types);
+    }
+
+    private static @NotNull CommentedConfigurationNode load(
+            final @NotNull Path path
+    ) throws IOException {
+        return YamlConfigurationLoader.builder()
+                .path(path)
+                .build()
+                .load();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void reloadAnimations(
+            final @NotNull Map<String, Sequence<Player>> animations,
+            final @NotNull ConfigurationNode holyWorldConfig
+    ) {
+        final Sequence<Player> holyWorld = animations.get("holyworld");
+        if (holyWorld instanceof ReloadObserver<?> observer) {
+            ((ReloadObserver<ConfigurationNode>) observer).onReload(holyWorldConfig);
+        }
     }
 
     private void saveDefaultResource(

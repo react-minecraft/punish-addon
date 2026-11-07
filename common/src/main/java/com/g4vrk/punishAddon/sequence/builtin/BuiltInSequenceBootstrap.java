@@ -31,7 +31,7 @@ public final class BuiltInSequenceBootstrap {
 
         // registering
 
-        final ActionParser<Audience> actionParser = React.INSTANCE.getActionParser();
+        final ActionParser<Audience> actionParser = React.INSTANCE.actionParser();
 
         builtInSequenceRegistry.register("holyworld", new HolyWorldVisualSequence(60, actionParser::parseAll, pendingActionManager));
 

@@ -37,7 +37,7 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
         final AtomicReference<Task> taskReference = new AtomicReference<>();
         final AtomicLong elapsed = new AtomicLong();
 
-        final Task task = React.INSTANCE.getScheduler().schedule(
+        final Task task = React.INSTANCE.scheduler().schedule(
                 () -> {
 
                     final Task currentTask = taskReference.get();

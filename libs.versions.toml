@@ -3,7 +3,9 @@
 paper-api = "1.21.11-R0.1-SNAPSHOT"
 minecraft = "1.21.11"
 
-react = "1.0.7"
+react = "0e9eae912f"
+actions = "2.1.2"
+schedula = "1.1.0"
 
 packetevents = "2.13.0"
 configurate = "4.2.0"
@@ -21,7 +23,10 @@ run-task = "3.0.2"
 
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
 
-react = { module = "com.github.g4vrk.React:react-common", version.ref = "react" }
+react-api = { module = "com.github.react-minecraft.plugin:react-api", version.ref = "react" }
+react-common = { module = "com.github.react-minecraft.plugin:react-common", version.ref = "react" }
+actions = { module = "com.github.g4vrk:FunctionalActions", version.ref = "actions" }
+schedula-common = { module = "com.github.g4vrk.Schedula:common", version.ref = "schedula" }
 
 packetevents = { module = "com.github.retrooper:packetevents-spigot", version.ref = "packetevents" }
 configurate-yaml = { module = "org.spongepowered:configurate-yaml", version.ref = "configurate" }

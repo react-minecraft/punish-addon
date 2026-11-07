@@ -1,7 +1,6 @@
 package com.g4vrk.punishAddon.sequence.builtin.impl;
 
 import com.g4vrk.functionalActions.list.ExecutableActionList;
-import com.g4vrk.functionalConfiguration.Config;
 import com.g4vrk.punishAddon.ReactPunishAddon;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.impl.VisualSequence;
@@ -12,6 +11,7 @@ import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 import org.jetbrains.annotations.NotNull;
+import org.spongepowered.configurate.ConfigurationNode;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -50,13 +50,13 @@ public final class HolyWorldVisualSequence extends VisualSequence {
         super(duration, actionParser);
         this.pendingActionManager = pendingActionManager;
 
-        this.onReload(ReactPunishAddon.INSTANCE.getHolyWorldConfig());
+        this.onReload(ReactPunishAddon.INSTANCE.holyWorldConfig());
 
     }
 
     @Override
     public void onReload(
-            final @NotNull Config config
+            final @NotNull ConfigurationNode config
     ) {
 
         super.onReload(config);

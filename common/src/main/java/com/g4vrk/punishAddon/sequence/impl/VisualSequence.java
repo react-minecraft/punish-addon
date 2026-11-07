@@ -1,7 +1,6 @@
 package com.g4vrk.punishAddon.sequence.impl;
 
 import com.g4vrk.functionalActions.list.ExecutableActionList;
-import com.g4vrk.functionalConfiguration.Config;
 import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
@@ -9,13 +8,14 @@ import com.g4vrk.schedula.task.Task;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.serialize.SerializationException;
 
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public abstract class VisualSequence extends TimedTickingSequence implements ReloadObserver {
+public abstract class VisualSequence extends TimedTickingSequence implements ReloadObserver<ConfigurationNode> {
 
     private final Function<List<String>, ExecutableActionList<? super Audience>> actionParser;
 
@@ -36,7 +36,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
     @Override
     public void onReload(
-            final @NotNull Config config
+            final @NotNull ConfigurationNode config
     ) {
 
         try {
