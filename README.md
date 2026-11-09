@@ -36,15 +36,19 @@
 
 | Команда | Право |
 |---|---|
-| `/react punish <тип> [анимация] <игрок> [причина]` | `react.punish` и `react.punish.<тип>` |
+| `/punish <тип> [анимация] <игроки> <причина>` | `react.command.punish` и `react.punish.<тип>` |
 
-`[анимация]` спрашивается, только если у типа стоит `need-to-select-in-command: true`.
+- Команда своя, на Cloud API плагина: её имя задаёт `settings.command`, плагин снимает её вместе с аддоном.
+- `<игроки>` — ник или селектор (`@a`, `@p`).
+- `[анимация]` спрашивается, только если у типа стоит `need-to-select-in-command: true`.
+- `/react reload` перечитывает конфиги и пересобирает команду.
+- Если игрок вышел во время анимации, действия выполнятся, когда он зайдёт.
 
 ## Конфиг
 
 ```yaml
 settings:
-  argument-literal: punish   # слово после /react
+  command: punish   # /punish; старый ключ argument-literal тоже читается
 
 types:
   kick:
@@ -52,8 +56,10 @@ types:
       need-to-select-in-command: true
       selected: holyworld
     actions:
-      - 'kick {player.name} {context.input-after-type}'
+      - 'kick {player.name} {reason}'
 ```
+
+В действиях доступны `{player.name}`, `{player.uuid}` и `{reason}` (старое `{context.input-after-type}` тоже работает).
 
 ## Установка
 

@@ -1,9 +1,9 @@
 package com.g4vrk.punishAddon.sequence.impl;
 
 import com.g4vrk.punishAddon.sequence.Sequence;
-import com.g4vrk.react.React;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
+import com.g4vrk.schedula.task.scheduler.Scheduler;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -15,12 +15,15 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
 
     private final long duration;
     private final TickSchedule tickSchedule;
+    private final Scheduler scheduler;
 
     protected TimedTickingSequence(
-            final long duration
+            final long duration,
+            final @NotNull Scheduler scheduler
     ) {
 
         this.duration = duration;
+        this.scheduler = scheduler;
         this.tickSchedule = TickSchedule.repeating(2, 1);
 
     }
@@ -37,7 +40,7 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
         final AtomicReference<Task> taskReference = new AtomicReference<>();
         final AtomicLong elapsed = new AtomicLong();
 
-        final Task task = React.INSTANCE.scheduler().schedule(
+        final Task task = this.scheduler.schedule(
                 () -> {
 
                     final Task currentTask = taskReference.get();

@@ -1,6 +1,7 @@
 settings:
 
-  argument-literal: punish
+  # The command: /punish <type> [animation] <players> <reason>
+  command: punish
 
 types:
 
@@ -11,7 +12,7 @@ types:
       selected: holyworld
 
     actions:
-      - 'kick {player.name} {context.input-after-type}'
+      - 'kick {player.name} {reason}'
 
   ban:
 
@@ -20,7 +21,7 @@ types:
       selected: holyworld
 
     actions:
-      - 'ban {player.name} {context.input-after-type}'
+      - 'ban {player.name} {reason}'
 
   mute:
 
@@ -29,4 +30,4 @@ types:
       selected: holyworld
 
     actions:
-      - 'mute {player.name} {context.input-after-type}'
+      - 'mute {player.name} {reason}'

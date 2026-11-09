@@ -4,7 +4,7 @@ include(
     "common"
 )
 
-val localPlugin = file("../react-vector")
+val localPlugin = file("../plugin")
 if (System.getenv("CI") == null && localPlugin.resolve("common").isDirectory) {
     includeBuild(localPlugin) {
         dependencySubstitution {

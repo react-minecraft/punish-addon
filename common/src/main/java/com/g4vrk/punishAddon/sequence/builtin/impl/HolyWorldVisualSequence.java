@@ -1,10 +1,10 @@
 package com.g4vrk.punishAddon.sequence.builtin.impl;
 
 import com.g4vrk.functionalActions.list.ExecutableActionList;
-import com.g4vrk.punishAddon.ReactPunishAddon;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.impl.VisualSequence;
 import com.g4vrk.schedula.task.Task;
+import com.g4vrk.schedula.task.scheduler.Scheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.Color;
 import org.bukkit.Particle;
@@ -43,14 +43,16 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     public HolyWorldVisualSequence(
             final long duration,
+            final @NotNull Scheduler scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
-            final @NotNull PendingActionManager pendingActionManager
+            final @NotNull PendingActionManager pendingActionManager,
+            final @NotNull ConfigurationNode config
     ) {
 
-        super(duration, actionParser);
+        super(duration, scheduler, actionParser);
         this.pendingActionManager = pendingActionManager;
 
-        this.onReload(ReactPunishAddon.INSTANCE.holyWorldConfig());
+        this.onReload(config);
 
     }
 

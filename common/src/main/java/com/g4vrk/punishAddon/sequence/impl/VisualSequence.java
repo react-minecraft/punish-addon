@@ -5,6 +5,7 @@ import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.schedula.task.Task;
+import com.g4vrk.schedula.task.scheduler.Scheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -25,10 +26,11 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
     protected VisualSequence(
             final long duration,
+            final @NotNull Scheduler scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser
     ) {
 
-        super(duration);
+        super(duration, scheduler);
 
         this.actionParser = actionParser;
 

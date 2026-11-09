@@ -2,421 +2,228 @@ package com.g4vrk.punishAddon;
 
 import com.g4vrk.functionalActions.ExecutableAction;
 import com.g4vrk.functionalActions.parser.ActionParser;
-import com.g4vrk.punishAddon.command.argument.PunishArgument;
+import com.g4vrk.punishAddon.command.PunishCommand;
 import com.g4vrk.punishAddon.config.AnimationSettings;
 import com.g4vrk.punishAddon.config.PunishType;
-import com.g4vrk.punishAddon.listener.JoinListener;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
 import com.g4vrk.react.React;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.react.api.addon.JavaAddon;
+import com.g4vrk.react.api.event.Subscribe;
+import com.g4vrk.react.api.event.plugin.ReloadEvent;
 import com.g4vrk.schedula.task.TickSchedule;
 import net.kyori.adventure.audience.Audience;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.HandlerList;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.plugin.Plugin;
-import org.incendo.cloud.bukkit.data.MultiplePlayerSelector;
-import org.incendo.cloud.context.CommandContext;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
-import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 import org.spongepowered.configurate.serialize.SerializationException;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
-public final class ReactPunishAddon extends JavaAddon {
+/**
+ * Punishes players with a command and plays an animation over them first.
+ *
+ * <p>The command, the join listener and the reload subscription all go through the addon
+ * environment, so the plugin removes them when the addon is disabled.</p>
+ */
+public final class ReactPunishAddon extends JavaAddon implements Listener {
 
-    public static ReactPunishAddon INSTANCE;
+    private static final String MAIN_CONFIG = "main-config.yml";
+    private static final String HOLYWORLD_CONFIG = "animations/holyworld.yml";
+    private static final String DEFAULT_LABEL = "punish";
 
-    private volatile PendingActionManager pendingActionManager;
-
-    private volatile CommentedConfigurationNode mainConfig;
-    private volatile CommentedConfigurationNode holyWorldConfig;
+    private final PendingActionManager pending = new PendingActionManager();
 
     private volatile Map<String, Sequence<Player>> animations;
-
-    private volatile Map<String, PunishType> types;
-
-    private volatile Listener listener;
-
-    private final AtomicBoolean reloading = new AtomicBoolean();
-
-    @Override
-    public void onLoad() {
-        INSTANCE = this;
-    }
+    private volatile Map<String, PunishType> types = Map.of();
+    private volatile String label = DEFAULT_LABEL;
 
     @Override
     public void onEnable() {
+        saveDefaultResource(MAIN_CONFIG);
+        saveDefaultResource(HOLYWORLD_CONFIG);
 
-        this.saveDefaultResource("main-config.yml");
-        this.saveDefaultResource("animations/holyworld.yml");
+        load();
 
-        final React react = React.INSTANCE;
+        environment().listeners().register(this);
+        registerCommand();
 
-        this.pendingActionManager = new PendingActionManager();
-
-        this.listener = new JoinListener(pendingActionManager::thenJoin);
-
-        final Plugin pluginInstance = react.plugin();
-
-        pluginInstance.getServer().getPluginManager().registerEvents(this.listener, pluginInstance);
-
-        this.loadConfigurableModules();
-
-        final PunishArgument punishArgument =
-                new PunishArgument(
-                        react.commands().builderFactory(),
-                        this.mainConfig
-                                .node("settings", "argument-literal")
-                                .getString("menu"),
-                        this.types,
-                        this::handlePunish
-                );
-
-        punishArgument.register(
-                react.commands().manager()
-        );
-
-        slf4jLogger().info(
-                "ReactPunishAddon successfully enabled!"
-        );
-    }
-
-    private void handlePunish(
-            final @NotNull CommandContext<CommandSender> context,
-            final @NotNull PunishContext punishContext
-    ) {
-        final MultiplePlayerSelector selector =
-                punishContext.players();
-
-        final Sequence<Player> sequence =
-                punishContext.punishType()
-                        .sequence(punishContext.animation());
-
-        if (sequence == null) {
-            throw new IllegalStateException(
-                    "Sequence '" + punishContext.animation() +
-                            "' is not registered"
-            );
-        }
-
-        for (final Player player : selector.values()) {
-
-            final PunishContext playerContext =
-                    new PunishContext(
-                            punishContext.type(),
-                            punishContext.animation(),
-                            punishContext.inputAfterType(),
-                            punishContext.punishType(),
-                            selector
-                    );
-
-            sequence.newSession(
-                    player,
-                    ignored -> this.executeActions(
-                            player,
-                            playerContext
-                    )
-            ).start();
-        }
-    }
-
-    private void executeActions(
-            final @NotNull Player player,
-            final @NotNull PunishContext context
-    ) {
-        final Function<String, String> placeholders =
-                input -> {
-
-                    if (input == null) {
-                        return null;
-                    }
-
-                    return input
-                            .replace(
-                                    "{player.name}",
-                                    player.getName()
-                            )
-                            .replace(
-                                    "{player.uuid}",
-                                    player.getUniqueId().toString()
-                            )
-                            .replace(
-                                    "{context.input-after-type}",
-                                    context.inputAfterType()
-                            );
-                };
-
-        for (final ExecutableAction<? super Audience> action
-                : context.punishType().actions()) {
-
-            try {
-                action.execute(
-                        player,
-                        placeholders
-                );
-            } catch (final Throwable throwable) {
-                slf4jLogger().error(
-                        "Failed to execute punishment action for {}",
-                        player.getName(),
-                        throwable
-                );
-            }
-        }
+        logger().info("Punish types: {}, command /{}", this.types.keySet(), this.label);
     }
 
     @Override
     public void onDisable() {
-        if (this.listener != null) {
-            HandlerList.unregisterAll(this.listener);
-            this.listener = null;
-        }
-        slf4jLogger().info(
-                "ReactPunishAddon successfully disabled!"
-        );
+        this.pending.clear();
     }
 
-    public @NotNull CompletableFuture<Void> reloadAsync() {
-
-        if (!this.reloading.compareAndSet(false, true)) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException(
-                            "Punish addon is already reloading"
-                    )
-            );
-        }
-
-        return CompletableFuture
-                .runAsync(this::loadConfigurableModules)
-                .thenCompose(ignored -> {
-
-                    final CompletableFuture<Void> future =
-                            new CompletableFuture<>();
-
-                    React.INSTANCE.scheduler().schedule(
-                            () -> {
-                                try {
-                                    future.complete(null);
-                                } catch (final Throwable throwable) {
-                                    future.completeExceptionally(
-                                            throwable
-                                    );
-                                }
-                            },
-                            TickSchedule.instant()
-                    );
-
-                    return future;
-                })
-                .whenComplete(
-                        (ignored, throwable) -> {
-                            this.reloading.set(false);
-
-                            if (throwable != null) {
-                                slf4jLogger().error(
-                                        "Failed to reload ReactPunishAddon",
-                                        throwable
-                                );
-                            }
-                        }
-                );
-    }
-
-    public @NotNull ConfigurationNode mainConfig() {
-        return this.mainConfig;
-    }
-
-    public @NotNull ConfigurationNode holyWorldConfig() {
-        return this.holyWorldConfig;
-    }
-
-    public @NotNull Map<String, Sequence<Player>> animations() {
-        return this.animations;
-    }
-
-    public @NotNull Map<String, PunishType> types() {
-        return this.types;
-    }
-
-    private void loadConfigurableModules() {
-
-        final Path mainConfigPath =
-                directory()
-                        .toPath()
-                        .resolve("main-config.yml");
-
-        final Path holyWorldConfigPath =
-                directory()
-                        .toPath()
-                        .resolve("animations/holyworld.yml");
-
-        final CommentedConfigurationNode config;
-        final CommentedConfigurationNode holyWorldConfig;
+    /**
+     * Re-reads the configs after {@code /react reload} and rebuilds the command, since its
+     * literals are the type and animation ids.
+     */
+    @Subscribe
+    public void onReload(final @NotNull ReloadEvent event) {
+        final String previous = this.label;
 
         try {
-            config = load(mainConfigPath);
-            holyWorldConfig = load(holyWorldConfigPath);
-        } catch (final IOException exception) {
-            throw new RuntimeException(
-                    "Failed to load configs",
-                    exception
-            );
+            load();
+        } catch (final RuntimeException exception) {
+            logger().error("Could not reload the punish addon, keeping the old settings", exception);
+            return;
         }
 
-        this.mainConfig = config;
-        this.holyWorldConfig = holyWorldConfig;
+        environment().scheduler().schedule(() -> {
+            environment().commands().unregister(previous);
+            registerCommand();
+        }, TickSchedule.instant());
+    }
 
-        final Map<String, Sequence<Player>> animations;
-        if (this.animations == null) {
-            animations = BuiltInSequenceBootstrap.bootstrap(this.pendingActionManager);
+    @EventHandler
+    public void onJoin(final @NotNull PlayerJoinEvent event) {
+        this.pending.thenJoin(event.getPlayer());
+    }
+
+    private void registerCommand() {
+        new PunishCommand(this.label, this.types, this::punish).register(environment().commands());
+    }
+
+    private void punish(final @NotNull Player player, final @NotNull PunishContext context) {
+        final Sequence<Player> sequence = context.punishType().sequence(context.animation());
+
+        if (sequence == null) {
+            logger().warn("Animation '{}' is unknown, punishing {} without it", context.animation(), player.getName());
+            execute(player, context);
+            return;
+        }
+
+        sequence.newSession(player, ignored -> execute(player, context)).start();
+    }
+
+    private void execute(final @NotNull Player player, final @NotNull PunishContext context) {
+        final String name = player.getName();
+        final String uuid = player.getUniqueId().toString();
+        final String reason = context.reason();
+
+        final UnaryOperator<String> placeholders = input -> input == null ? null : input
+                .replace("{player.name}", name)
+                .replace("{player.uuid}", uuid)
+                .replace("{context.input-after-type}", reason)
+                .replace("{reason}", reason);
+
+        for (final ExecutableAction<? super Audience> action : context.punishType().actions()) {
+            try {
+                action.execute(player, placeholders);
+            } catch (final RuntimeException exception) {
+                logger().error("Punishment action of type '{}' failed for {}", context.type(), name, exception);
+            }
+        }
+    }
+
+    private void load() {
+        final CommentedConfigurationNode main = read(MAIN_CONFIG);
+        final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG);
+        final ActionParser<Audience> parser = React.INSTANCE.actionParser();
+
+        Map<String, Sequence<Player>> animations = this.animations;
+        if (animations == null) {
+            animations = BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, this.pending, holyWorld);
         } else {
-            animations = this.animations;
-            this.reloadAnimations(animations, holyWorldConfig);
+            reloadHolyWorld(animations, holyWorld);
         }
 
-        final ActionParser<Audience> actionParser =
-                React.INSTANCE.actionParser();
+        final ConfigurationNode settings = main.node("settings");
+        // "argument-literal" is the key of the old /react subcommand; it still names the command.
+        final String label = settings.node("command").getString(
+                settings.node("argument-literal").getString(DEFAULT_LABEL));
 
         final Map<String, PunishType> types;
-
         try {
-            types = this.loadTypes(
-                    config.node("types"),
-                    animations,
-                    actionParser
-            );
-        } catch (final SerializationException ex) {
-            throw new RuntimeException(
-                    "Failed to load punishment types",
-                    ex
-            );
+            types = loadTypes(main.node("types"), animations, parser);
+        } catch (final SerializationException exception) {
+            throw new IllegalStateException("Could not read the punishment types", exception);
         }
 
         this.animations = animations;
         this.types = types;
+        this.label = label;
     }
 
     private @NotNull Map<String, PunishType> loadTypes(
-            final @NotNull ConfigurationNode typesNode,
+            final @NotNull ConfigurationNode node,
             final @NotNull Map<String, Sequence<Player>> animations,
-            final @NotNull ActionParser<Audience> actionParser
+            final @NotNull ActionParser<Audience> parser
     ) throws SerializationException {
-        final Map<String, PunishType> types =
-                new HashMap<>();
+        final Map<String, PunishType> types = new LinkedHashMap<>();
 
-        for (final Map.Entry<Object, ? extends ConfigurationNode> entry
-                : typesNode.childrenMap().entrySet()) {
+        for (final Map.Entry<Object, ? extends ConfigurationNode> entry : node.childrenMap().entrySet()) {
+            final String id = String.valueOf(entry.getKey());
+            final ConfigurationNode type = entry.getValue();
+            final ConfigurationNode animation = type.node("animation");
 
-            final String typeId =
-                    String.valueOf(entry.getKey());
+            final AnimationSettings settings = new AnimationSettings(
+                    animation.node("need-to-select-in-command").getBoolean(false),
+                    animation.node("selected").getString(BuiltInSequenceBootstrap.HOLYWORLD));
 
-            final ConfigurationNode typeNode =
-                    entry.getValue();
+            if (!settings.needToSelectInCommand() && !animations.containsKey(settings.selected())) {
+                logger().warn("Type '{}' selects the unknown animation '{}'", id, settings.selected());
+            }
 
-            final ConfigurationNode animationNode =
-                    typeNode.node("animation");
+            final List<String> lines = type.node("actions").getList(String.class, List.of());
+            final List<ExecutableAction<? super Audience>> actions = new ArrayList<>(lines.size());
 
-            final AnimationSettings animation =
-                    new AnimationSettings(
-                            animationNode
-                                    .node("need-to-select-in-command")
-                                    .getBoolean(false),
-
-                            animationNode
-                                    .node("selected")
-                                    .getString("holyworld")
-                    );
-
-            final List<String> actionStrings =
-                    typeNode
-                            .node("actions")
-                            .getList(
-                                    String.class,
-                                    List.of()
-                            );
-
-            final List<ExecutableAction<? super Audience>> actions =
-                    new ArrayList<>(
-                            actionStrings.size()
-                    );
-
-            for (final String actionString : actionStrings) {
-
-                final ExecutableAction<? super Audience> action =
-                        actionParser.parse(actionString);
+            for (final String line : lines) {
+                final ExecutableAction<? super Audience> action = parser.parse(line);
 
                 if (action == null) {
-                    slf4jLogger().warn(
-                            "Unknown action '{}' in punishment type '{}'",
-                            actionString,
-                            typeId
-                    );
+                    logger().warn("Unknown action '{}' in punishment type '{}'", line, id);
                     continue;
                 }
 
                 actions.add(action);
             }
 
-            types.put(
-                    typeId,
-                    new PunishType(
-                            animations,
-                            animation,
-                            List.copyOf(actions)
-                    )
-            );
+            types.put(id, new PunishType(animations, settings, List.copyOf(actions)));
         }
 
-        return Map.copyOf(types);
-    }
-
-    private static @NotNull CommentedConfigurationNode load(
-            final @NotNull Path path
-    ) throws IOException {
-        return YamlConfigurationLoader.builder()
-                .path(path)
-                .build()
-                .load();
+        return java.util.Collections.unmodifiableMap(types);
     }
 
     @SuppressWarnings("unchecked")
-    private void reloadAnimations(
+    private static void reloadHolyWorld(
             final @NotNull Map<String, Sequence<Player>> animations,
-            final @NotNull ConfigurationNode holyWorldConfig
+            final @NotNull ConfigurationNode config
     ) {
-        final Sequence<Player> holyWorld = animations.get("holyworld");
-        if (holyWorld instanceof ReloadObserver<?> observer) {
-            ((ReloadObserver<ConfigurationNode>) observer).onReload(holyWorldConfig);
+        if (animations.get(BuiltInSequenceBootstrap.HOLYWORLD) instanceof ReloadObserver<?> observer) {
+            ((ReloadObserver<ConfigurationNode>) observer).onReload(config);
         }
     }
 
-    private void saveDefaultResource(
-            final @NotNull String resourcePath
-    ) {
-        final Path path =
-                directory()
-                        .toPath()
-                        .resolve(resourcePath);
+    private @NotNull CommentedConfigurationNode read(final @NotNull String name) {
+        try {
+            return YamlConfigurationLoader.builder().path(directory().resolve(name)).build().load();
+        } catch (final IOException exception) {
+            throw new IllegalStateException("Could not load " + name, exception);
+        }
+    }
+
+    private void saveDefaultResource(final @NotNull String name) {
+        final Path path = directory().resolve(name);
 
         if (!path.toFile().exists()) {
-            super.saveResource(
-                    resourcePath,
-                    false
-            );
+            saveResource(name, false);
         }
     }
+
 }
