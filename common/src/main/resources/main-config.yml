@@ -12,7 +12,7 @@ types:
       selected: holyworld
 
     actions:
-      - 'kick {player.name} {reason}'
+      - '[console] kick {player.name} {reason}'
 
   ban:
 
@@ -21,7 +21,7 @@ types:
       selected: holyworld
 
     actions:
-      - 'ban {player.name} {reason}'
+      - '[console] ban {player.name} {reason}'
 
   mute:
 
@@ -30,4 +30,4 @@ types:
       selected: holyworld
 
     actions:
-      - 'mute {player.name} {reason}'
+      - '[console] mute {player.name} {reason}'

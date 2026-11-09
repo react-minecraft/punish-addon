@@ -82,7 +82,7 @@ subprojects {
 
         withType<ShadowJar>().configureEach {
 
-            archiveFileName = "${rootProject.name.lowercase()}-${project.name}-${project.version}.jar"
+            archiveFileName = "punish-addon-${project.version}.jar"
             archiveClassifier = ""
 
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE

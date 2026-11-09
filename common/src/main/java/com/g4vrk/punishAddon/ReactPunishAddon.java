@@ -8,7 +8,6 @@ import com.g4vrk.punishAddon.config.PunishType;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
-import com.g4vrk.react.React;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.react.api.addon.JavaAddon;
 import com.g4vrk.react.api.event.Subscribe;
@@ -134,7 +133,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     private void load() {
         final CommentedConfigurationNode main = read(MAIN_CONFIG);
         final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG);
-        final ActionParser<Audience> parser = React.INSTANCE.actionParser();
+        final ActionParser<Audience> parser = environment().actions();
 
         Map<String, Sequence<Player>> animations = this.animations;
         if (animations == null) {
