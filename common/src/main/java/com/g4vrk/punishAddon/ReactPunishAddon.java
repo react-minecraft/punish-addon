@@ -173,7 +173,8 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
             final AnimationSettings settings = new AnimationSettings(
                     animation.node("need-to-select-in-command").getBoolean(false),
-                    animation.node("selected").getString(BuiltInSequenceBootstrap.HOLYWORLD));
+                    animation.node("selected").getString(BuiltInSequenceBootstrap.HOLYWORLD)
+            );
 
             if (!settings.needToSelectInCommand() && !animations.containsKey(settings.selected())) {
                 logger().warn("Type '{}' selects the unknown animation '{}'", id, settings.selected());

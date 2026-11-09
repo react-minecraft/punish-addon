@@ -30,8 +30,16 @@ public final class BuiltInSequenceBootstrap {
     ) {
         final BuiltInSequenceRegistry<Player> registry = new BuiltInSequenceRegistry<>();
 
-        registry.register(HOLYWORLD, new HolyWorldVisualSequence(
-                60, scheduler, actionParser::parseAll, pendingActionManager, holyWorldConfig));
+        registry.register(
+                HOLYWORLD,
+                new HolyWorldVisualSequence(
+                        60,
+                        scheduler,
+                        actionParser::parseAll,
+                        pendingActionManager,
+                        holyWorldConfig
+                )
+        );
 
         return registry.all();
     }
