@@ -20,6 +20,8 @@ import java.util.function.Function;
 
 public final class HolyWorldVisualSequence extends VisualSequence {
 
+    private static final Particle DUST = dustParticle();
+
     private static final double TWO_PI = Math.PI * 2.0D;
 
     private final PendingActionManager pendingActionManager;
@@ -40,6 +42,14 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     private double[] circleX;
     private double[] circleZ;
+
+    private static @NotNull Particle dustParticle() {
+        try {
+            return Particle.valueOf("DUST");
+        } catch (final IllegalArgumentException legacy) {
+            return Particle.valueOf("REDSTONE");
+        }
+    }
 
     public HolyWorldVisualSequence(
             final long duration,
@@ -251,7 +261,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
                             + localZ * rotationCos;
 
             player.getWorld().spawnParticle(
-                    Particle.DUST,
+                    DUST,
 
                     centerX
                             + finalX

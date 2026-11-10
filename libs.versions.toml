@@ -1,9 +1,9 @@
 [versions]
 
-paper-api = "1.21.11-R0.1-SNAPSHOT"
+paper-api = "1.18.2-R0.1-SNAPSHOT"
 minecraft = "1.21.11"
 
-react = "c368ef1"
+react = "f5773cd"
 actions = "2.2.0"
 schedula = "1.1.2"
 
