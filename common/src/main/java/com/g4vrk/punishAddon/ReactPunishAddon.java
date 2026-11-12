@@ -52,6 +52,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     @Override
     public void onEnable() {
+
         saveDefaultResource(MAIN_CONFIG);
         saveDefaultResource(HOLYWORLD_CONFIG);
 
@@ -61,11 +62,14 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         registerCommand();
 
         logger().info("Punish types: {}, command /{}", this.types.keySet(), this.label);
+
     }
 
     @Override
     public void onDisable() {
+
         this.pending.clear();
+
     }
 
     /**
@@ -74,6 +78,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
      */
     @Subscribe
     public void onReload(final @NotNull ReloadEvent event) {
+
         final String previous = this.label;
 
         try {
@@ -87,18 +92,24 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             environment().commands().unregister(previous);
             registerCommand();
         }, TickSchedule.instant());
+
     }
 
     @EventHandler
     public void onJoin(final @NotNull PlayerJoinEvent event) {
+
         this.pending.thenJoin(event.getPlayer());
+
     }
 
     private void registerCommand() {
+
         new PunishCommand(this.label, this.types, this::punish).register(environment().commands());
+
     }
 
     private void punish(final @NotNull Player player, final @NotNull PunishContext context) {
+
         final Sequence<Player> sequence = context.punishType().sequence(context.animation());
 
         if (sequence == null) {
@@ -107,10 +118,12 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             return;
         }
 
-        sequence.newSession(player, ignored -> execute(player, context)).start();
+        sequence.newSession(player, target -> execute(target, context)).start();
+
     }
 
     private void execute(final @NotNull Player player, final @NotNull PunishContext context) {
+
         final String name = player.getName();
         final String uuid = player.getUniqueId().toString();
         final String reason = context.reason();
@@ -128,9 +141,11 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
                 logger().error("Punishment action of type '{}' failed for {}", context.type(), name, exception);
             }
         }
+
     }
 
     private void load() {
+
         final CommentedConfigurationNode main = read(MAIN_CONFIG);
         final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG);
         final ActionParser<Audience> parser = environment().actions();
@@ -157,6 +172,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         this.animations = animations;
         this.types = types;
         this.label = label;
+
     }
 
     private @NotNull Map<String, PunishType> loadTypes(
@@ -164,6 +180,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             final @NotNull Map<String, Sequence<Player>> animations,
             final @NotNull ActionParser<Audience> parser
     ) throws SerializationException {
+
         final Map<String, PunishType> types = new LinkedHashMap<>();
 
         for (final Map.Entry<Object, ? extends ConfigurationNode> entry : node.childrenMap().entrySet()) {
@@ -198,6 +215,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         }
 
         return java.util.Collections.unmodifiableMap(types);
+
     }
 
     @SuppressWarnings("unchecked")
@@ -205,25 +223,31 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             final @NotNull Map<String, Sequence<Player>> animations,
             final @NotNull ConfigurationNode config
     ) {
+
         if (animations.get(BuiltInSequenceBootstrap.HOLYWORLD) instanceof ReloadObserver<?> observer) {
             ((ReloadObserver<ConfigurationNode>) observer).onReload(config);
         }
+
     }
 
     private @NotNull CommentedConfigurationNode read(final @NotNull String name) {
+
         try {
             return YamlConfigurationLoader.builder().path(directory().resolve(name)).build().load();
         } catch (final IOException exception) {
             throw new IllegalStateException("Could not load " + name, exception);
         }
+
     }
 
     private void saveDefaultResource(final @NotNull String name) {
+
         final Path path = directory().resolve(name);
 
         if (!path.toFile().exists()) {
             saveResource(name, false);
         }
+
     }
 
 }

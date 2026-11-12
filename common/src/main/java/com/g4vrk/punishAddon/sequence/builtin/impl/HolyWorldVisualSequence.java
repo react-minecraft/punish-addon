@@ -44,11 +44,13 @@ public final class HolyWorldVisualSequence extends VisualSequence {
     private double[] circleZ;
 
     private static @NotNull Particle dustParticle() {
+
         try {
             return Particle.valueOf("DUST");
         } catch (final IllegalArgumentException legacy) {
             return Particle.valueOf("REDSTONE");
         }
+
     }
 
     public HolyWorldVisualSequence(
@@ -169,7 +171,9 @@ public final class HolyWorldVisualSequence extends VisualSequence {
     protected void start(
             final @NotNull Player source
     ) {
+
         source.addPotionEffect(PotionEffectType.LEVITATION.createEffect(Math.toIntExact(duration()), 1));
+
     }
 
     @Override
@@ -182,7 +186,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
         if (!player.isOnline()) {
 
-            pendingActionManager.add(player, () -> onEnd.accept(player));
+            pendingActionManager.add(player.getUniqueId(), onEnd);
 
             currentTask.cancel();
             return;
