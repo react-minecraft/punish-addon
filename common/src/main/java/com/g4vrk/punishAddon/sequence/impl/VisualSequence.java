@@ -1,10 +1,11 @@
 package com.g4vrk.punishAddon.sequence.impl;
 
 import com.g4vrk.functionalActions.list.ExecutableActionList;
+import com.g4vrk.punishAddon.action.PunishmentActionRunner;
+import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
-import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.scheduler.Scheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
@@ -16,23 +17,32 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+/**
+ * A ticked visual effect with configured actions at each stage.
+ */
 public abstract class VisualSequence extends TimedTickingSequence implements ReloadObserver<ConfigurationNode> {
 
     private final Function<List<String>, ExecutableActionList<? super Audience>> actionParser;
+    private final PunishmentActionRunner actionRunner;
+    private final PendingActionManager pending;
 
-    private Consumer<Player> onStart;
-    private Consumer<Player> thenTick;
-    private Consumer<Player> atEnd;
+    private ExecutableActionList<? super Audience> onStart;
+    private ExecutableActionList<? super Audience> thenTick;
+    private ExecutableActionList<? super Audience> atEnd;
 
     protected VisualSequence(
             final long duration,
             final @NotNull Scheduler scheduler,
-            final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser
+            final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
+            final @NotNull PunishmentActionRunner actionRunner,
+            final @NotNull PendingActionManager pending
     ) {
 
         super(duration, scheduler);
 
         this.actionParser = actionParser;
+        this.actionRunner = actionRunner;
+        this.pending = pending;
 
     }
 
@@ -49,7 +59,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                                     "actions",
                                     "on-start"
                             ).getList(String.class)
-                    )::run;
+                    );
 
             this.thenTick = actionParser
                     .apply(
@@ -57,7 +67,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                                     "actions",
                                     "then-tick"
                             ).getList(String.class)
-                    )::run;
+                    );
 
             this.atEnd = actionParser
                     .apply(
@@ -65,7 +75,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                                     "actions",
                                     "finally"
                             ).getList(String.class)
-                    )::run;
+                    );
 
         } catch (final SerializationException ex) {
 
@@ -81,43 +91,26 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
             final @NotNull Consumer<Player> onEnd
     ) {
 
-        return new DelegateSequenceSession(
-                () -> {
-
-                    start(source);
-
-                    onStart.accept(source);
-
-                    scheduleVisualSequence(
-                            (task, tick) -> {
-
-                                this.tick(
-                                        source,
-                                        task,
-                                        tick,
-                                        onEnd
-                                );
-
-                                thenTick.accept(source);
-
-                            },
-                            (task, tick) -> {
-
-                                end(
-                                        source,
-                                        task,
-                                        tick
-                                );
-
-                                onEnd.accept(source);
-
-                                atEnd.accept(source);
-
-                            }
-                    );
-
-                }
-        );
+        return new DelegateSequenceSession(() -> {
+            final PendingActionManager.Action action = pending.track(source.getUniqueId(), onEnd);
+            scheduleVisualSequence(
+                    source,
+                    action,
+                    () -> {
+                        start(source);
+                        actionRunner.run(source, onStart);
+                    },
+                    tick -> {
+                        tick(source, tick);
+                        actionRunner.run(source, thenTick);
+                    },
+                    () -> {
+                        if (action.complete(source)) {
+                            actionRunner.run(source, atEnd);
+                        }
+                    }
+            );
+        });
 
     }
 
@@ -127,14 +120,6 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
     protected abstract void tick(
             final @NotNull Player source,
-            final @NotNull Task currentTask,
-            final long tick,
-            final @NotNull Consumer<Player> onEnd
-    );
-
-    protected abstract void end(
-            final @NotNull Player source,
-            final @NotNull Task currentTask,
             final long tick
     );
 

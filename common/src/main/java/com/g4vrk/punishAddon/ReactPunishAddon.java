@@ -2,13 +2,13 @@ package com.g4vrk.punishAddon;
 
 import com.g4vrk.functionalActions.ExecutableAction;
 import com.g4vrk.functionalActions.parser.ActionParser;
+import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.command.PunishCommand;
 import com.g4vrk.punishAddon.config.AnimationSettings;
 import com.g4vrk.punishAddon.config.PunishType;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
-import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.react.api.addon.JavaAddon;
 import com.g4vrk.react.api.event.Subscribe;
 import com.g4vrk.react.api.event.plugin.ReloadEvent;
@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -27,6 +28,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     private final PendingActionManager pending = new PendingActionManager();
 
-    private volatile Map<String, Sequence<Player>> animations;
+    private PunishmentActionRunner actionRunner;
     private volatile Map<String, PunishType> types = Map.of();
     private volatile String label = DEFAULT_LABEL;
 
@@ -56,6 +58,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         saveDefaultResource(MAIN_CONFIG);
         saveDefaultResource(HOLYWORLD_CONFIG);
 
+        this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger());
         load();
 
         environment().listeners().register(this);
@@ -102,6 +105,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     }
 
+    @EventHandler
+    public void onQuit(final @NotNull PlayerQuitEvent event) {
+
+        this.pending.onQuit(event.getPlayer().getUniqueId());
+
+    }
+
     private void registerCommand() {
 
         new PunishCommand(this.label, this.types, this::punish).register(environment().commands());
@@ -114,7 +124,19 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
         if (sequence == null) {
             logger().warn("Animation '{}' is unknown, punishing {} without it", context.animation(), player.getName());
-            execute(player, context);
+            final PendingActionManager.Action action = pending.track(player.getUniqueId(), target -> execute(target, context));
+            try {
+                action.attach(environment().scheduler().scheduleEntity(player, () -> {
+                    if (player.isOnline()) {
+                        action.complete(player);
+                    } else {
+                        action.defer();
+                    }
+                }, TickSchedule.instant()));
+            } catch (final RuntimeException | Error failure) {
+                action.discard();
+                throw failure;
+            }
             return;
         }
 
@@ -134,13 +156,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
                 .replace("{context.input-after-type}", reason)
                 .replace("{reason}", reason);
 
-        for (final ExecutableAction<? super Audience> action : context.punishType().actions()) {
-            try {
-                action.execute(player, placeholders);
-            } catch (final RuntimeException exception) {
-                logger().error("Punishment action of type '{}' failed for {}", context.type(), name, exception);
-            }
-        }
+        actionRunner.run(player, context.punishType().actions(), placeholders);
 
     }
 
@@ -150,15 +166,12 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG);
         final ActionParser<Audience> parser = environment().actions();
 
-        Map<String, Sequence<Player>> animations = this.animations;
-        if (animations == null) {
-            animations = BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, this.pending, holyWorld);
-        } else {
-            reloadHolyWorld(animations, holyWorld);
-        }
+        final Map<String, Sequence<Player>> animations = BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, actionRunner, pending, holyWorld);
 
         final ConfigurationNode settings = main.node("settings");
-        // "argument-literal" is the key of the old /react subcommand; it still names the command.
+        /*
+         * Older configurations still use the argument-literal key for the command name.
+         */
         final String label = settings.node("command").getString(
                 settings.node("argument-literal").getString(DEFAULT_LABEL));
 
@@ -169,7 +182,6 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             throw new IllegalStateException("Could not read the punishment types", exception);
         }
 
-        this.animations = animations;
         this.types = types;
         this.label = label;
 
@@ -214,19 +226,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             types.put(id, new PunishType(animations, settings, List.copyOf(actions)));
         }
 
-        return java.util.Collections.unmodifiableMap(types);
-
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void reloadHolyWorld(
-            final @NotNull Map<String, Sequence<Player>> animations,
-            final @NotNull ConfigurationNode config
-    ) {
-
-        if (animations.get(BuiltInSequenceBootstrap.HOLYWORLD) instanceof ReloadObserver<?> observer) {
-            ((ReloadObserver<ConfigurationNode>) observer).onReload(config);
-        }
+        return Collections.unmodifiableMap(types);
 
     }
 

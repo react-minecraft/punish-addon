@@ -1,6 +1,7 @@
 package com.g4vrk.punishAddon.sequence.builtin;
 
 import com.g4vrk.functionalActions.parser.ActionParser;
+import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.impl.HolyWorldVisualSequence;
@@ -25,6 +26,7 @@ public final class BuiltInSequenceBootstrap {
     public static @NotNull Map<String, Sequence<Player>> bootstrap(
             final @NotNull Scheduler scheduler,
             final @NotNull ActionParser<Audience> actionParser,
+            final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pendingActionManager,
             final @NotNull ConfigurationNode holyWorldConfig
     ) {
@@ -36,6 +38,7 @@ public final class BuiltInSequenceBootstrap {
                         60,
                         scheduler,
                         actionParser::parseAll,
+                        actionRunner,
                         pendingActionManager,
                         holyWorldConfig
                 )

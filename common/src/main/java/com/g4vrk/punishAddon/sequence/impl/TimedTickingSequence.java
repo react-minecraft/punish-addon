@@ -1,5 +1,6 @@
 package com.g4vrk.punishAddon.sequence.impl;
 
+import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
@@ -7,14 +8,17 @@ import com.g4vrk.schedula.task.scheduler.Scheduler;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
+/**
+ * Runs an animation from start to completion on the target player's entity scheduler.
+ */
 public abstract class TimedTickingSequence implements Sequence<Player> {
 
+    private static final TickSchedule TICK_SCHEDULE = TickSchedule.repeating(1, 1);
+
     private final long duration;
-    private final TickSchedule tickSchedule;
     private final Scheduler scheduler;
 
     protected TimedTickingSequence(
@@ -24,62 +28,66 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
 
         this.duration = duration;
         this.scheduler = scheduler;
-        this.tickSchedule = TickSchedule.repeating(2, 1);
 
     }
 
     protected final void scheduleVisualSequence(
-            final @NotNull BiConsumer<Task, Long> tickConsumer,
-            final @NotNull BiConsumer<Task, Long> endConsumer
+            final @NotNull Player player,
+            final @NotNull PendingActionManager.Action action,
+            final @NotNull Runnable onStart,
+            final @NotNull LongConsumer onTick,
+            final @NotNull Runnable onEnd
     ) {
 
-        if (duration <= 0L) {
-            return;
+        final Task task;
+        try {
+            task = scheduler.scheduleEntity(player, new Consumer<Task>() {
+
+                private long elapsed = -2L;
+
+                @Override
+                public void accept(final @NotNull Task current) {
+
+                    if (!action.active() || !player.isOnline()) {
+                        action.defer();
+                        current.cancel();
+                        return;
+                    }
+                    try {
+                        final long tick = elapsed++;
+                        if (tick == -2L) {
+                            onStart.run();
+                        }
+                        if (tick < 0L) {
+                            return;
+                        }
+                        if (tick < duration) {
+                            onTick.accept(tick);
+                        }
+                        if (tick + 1L >= duration) {
+                            current.cancel();
+                            onEnd.run();
+                        }
+                    } catch (final RuntimeException | Error failure) {
+                        action.discard();
+                        throw failure;
+                    }
+
+                }
+
+            }, TICK_SCHEDULE);
+        } catch (final RuntimeException | Error failure) {
+            action.discard();
+            throw failure;
         }
-
-        final AtomicReference<Task> taskReference = new AtomicReference<>();
-        final AtomicLong elapsed = new AtomicLong();
-
-        final Task task = this.scheduler.schedule(
-                () -> {
-
-                    final Task currentTask = taskReference.get();
-
-                    if (currentTask == null || currentTask.isCancelled()) {
-                        return;
-                    }
-
-                    final long currentTick = elapsed.getAndIncrement();
-
-                    tickConsumer.accept(
-                            currentTask,
-                            currentTick
-                    );
-
-                    if (currentTask.isCancelled()) {
-                        return;
-                    }
-
-                    if (currentTick + 1L >= duration) {
-
-                        currentTask.cancel();
-
-                        endConsumer.accept(
-                                currentTask,
-                                currentTick
-                        );
-
-                    }
-
-                },
-                tickSchedule
-        );
-
-        taskReference.set(task);
+        action.attach(task);
 
     }
 
     public long duration() {
+
         return duration;
+
     }
+
 }

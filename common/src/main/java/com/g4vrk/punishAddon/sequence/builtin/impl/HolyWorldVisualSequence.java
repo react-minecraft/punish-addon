@@ -1,9 +1,9 @@
 package com.g4vrk.punishAddon.sequence.builtin.impl;
 
 import com.g4vrk.functionalActions.list.ExecutableActionList;
+import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.impl.VisualSequence;
-import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.scheduler.Scheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.Color;
@@ -15,16 +15,16 @@ import org.spongepowered.configurate.ConfigurationNode;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
+/**
+ * Plays the HolyWorld levitation and particle animation around a player.
+ */
 public final class HolyWorldVisualSequence extends VisualSequence {
 
     private static final Particle DUST = dustParticle();
 
     private static final double TWO_PI = Math.PI * 2.0D;
-
-    private final PendingActionManager pendingActionManager;
 
     private int particleCount;
 
@@ -57,12 +57,12 @@ public final class HolyWorldVisualSequence extends VisualSequence {
             final long duration,
             final @NotNull Scheduler scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
+            final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pendingActionManager,
             final @NotNull ConfigurationNode config
     ) {
 
-        super(duration, scheduler, actionParser);
-        this.pendingActionManager = pendingActionManager;
+        super(duration, scheduler, actionParser, actionRunner, pendingActionManager);
 
         this.onReload(config);
 
@@ -179,19 +179,8 @@ public final class HolyWorldVisualSequence extends VisualSequence {
     @Override
     protected void tick(
             final @NotNull Player player,
-            final @NotNull Task currentTask,
-            final long tick,
-            final @NotNull Consumer<Player> onEnd
+            final long tick
     ) {
-
-        if (!player.isOnline()) {
-
-            pendingActionManager.add(player.getUniqueId(), onEnd);
-
-            currentTask.cancel();
-            return;
-
-        }
 
         final var center = player.getLocation();
 
@@ -302,15 +291,6 @@ public final class HolyWorldVisualSequence extends VisualSequence {
             );
 
         }
-
-    }
-
-    @Override
-    protected void end(
-            final @NotNull Player source,
-            final @NotNull Task currentTask,
-            final long tick
-    ) {
 
     }
 
