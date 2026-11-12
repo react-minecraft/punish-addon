@@ -1,80 +1,62 @@
 <div align="center">
 
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Manrope&weight=700&size=38&pause=1000&color=EB2544&background=FFFFFF00&center=true&vCenter=true&width=700&lines=Punish+Addon" alt="Punish Addon Typing SVG"/></a>
+<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Manrope&weight=700&size=38&pause=1000&color=EB2544&background=FFFFFF00&center=true&vCenter=true&width=700&lines=Punish+Addon" alt="Punish Addon"/></a>
 
-<p>Наказания с анимацией для React</p>
+<p>Наказания с настраиваемой анимацией для React</p>
 
 <p>
-  <a href="https://github.com/react-minecraft/punish-addon/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/react-minecraft/punish-addon?style=flat&logo=opensourceinitiative&logoColor=white" alt="License">
-  </a>
-  <a href="https://github.com/react-minecraft/punish-addon/actions/workflows/build.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/react-minecraft/punish-addon/build.yml?branch=master&style=flat&logo=github" alt="Build">
-  </a>
+  <a href="https://react-ac.space"><img src="https://img.shields.io/badge/Website-EB2544?style=plastic&logo=googlechrome&logoColor=white" alt="Website"/></a>
+  <a href="https://t.me/react_ac"><img src="https://img.shields.io/badge/Telegram-26A5E4?style=plastic&logo=telegram&logoColor=white" alt="Telegram"/></a>
+  <a href="https://t.me/react_ac_support"><img src="https://img.shields.io/badge/Support-555555?style=plastic&logo=telegram&logoColor=white" alt="Support"/></a>
 </p>
 
 <p>
-  <a href="https://react-ac.space">Сайт</a>
-  &nbsp;•&nbsp;
-  <a href="https://t.me/react_ac">Канал</a>
-  &nbsp;•&nbsp;
-  <a href="https://t.me/react_ac_support">Поддержка</a>
+  <a href="https://github.com/react-minecraft/punish-addon/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/react-minecraft/punish-addon/build.yml?style=plastic&logo=github&logoColor=white&branch=master&label=build" alt="Build"/></a>
+  <a href="https://github.com/react-minecraft/punish-addon/releases/tag/nightly"><img src="https://img.shields.io/badge/Nightly-EB2544?style=plastic&logo=github&logoColor=white" alt="Nightly"/></a>
+  <a href="https://github.com/react-minecraft/punish-addon/blob/master/LICENSE"><img src="https://img.shields.io/github/license/react-minecraft/punish-addon?style=plastic&logo=opensourceinitiative&logoColor=white" alt="License"/></a>
 </p>
 
 </div>
 
----
+## Команда
 
-## Что это?
+`/punish <тип> [анимация] <игроки> <причина>` требует `react.punish.<тип>`. Вместо имени игрока можно использовать селектор. Аргумент анимации указывается, если у типа включён `animation.need-to-select-in-command`.
 
-- Аддон для плагина [React](https://github.com/react-minecraft/plugin): выдаёт наказания командой и перед этим
-  проигрывает над игроком анимацию из частиц.
-- Типы наказаний (`kick`, `ban`, `mute`) и их команды задаются в `main-config.yml`.
-- Анимации лежат в `animations/`, встроенная — `holyworld`.
+Анимация запускается на потоке игрока. Если игрок выходит до её завершения, наказание применяется при его следующем входе, пока аддон остаётся загружен.
 
-## Команды
+## Настройки
 
-| Команда | Право |
-|---|---|
-| `/punish <тип> [анимация] <игроки> <причина>` | `react.command.punish` и `react.punish.<тип>` |
-
-- Команда своя, на Cloud API плагина: её имя задаёт `settings.command`, плагин снимает её вместе с аддоном.
-- `<игроки>` — ник или селектор (`@a`, `@p`).
-- `[анимация]` спрашивается, только если у типа стоит `need-to-select-in-command: true`.
-- `/react reload` перечитывает конфиги и пересобирает команду.
-- Если игрок вышел во время анимации, действия выполнятся, когда он зайдёт.
-
-## Конфиг
+Название команды задаётся в `settings.command` файла `main-config.yml`. Доступные типы и их действия задаются в `types`. `/react reload` перечитывает настройки и пересобирает команду.
 
 ```yaml
-settings:
-  command: punish   # /punish; старый ключ argument-literal тоже читается
-
 types:
   kick:
     animation:
       need-to-select-in-command: true
       selected: holyworld
     actions:
-      - 'kick {player.name} {reason}'
+      - '[console] kick {player.name} {reason}'
 ```
 
-В действиях доступны `{player.name}`, `{player.uuid}` и `{reason}` (старое `{context.input-after-type}` тоже работает).
+Доступны `{player.name}`, `{player.uuid}`, `{reason}` и прежний `{context.input-after-type}`. Параметры встроенной анимации лежат в `animations/holyworld.yml`.
+
 
 ## Установка
 
-1. Соберите аддон или скачайте jar из релизов.
-2. Положите `reactpunishaddon-common-<версия>.jar` в `plugins/React/addons/`.
-3. Перезапустите сервер. Конфиг появится в папке аддона.
+1. Возьмите `punish-addon-*.jar` со страницы [Nightly](https://github.com/react-minecraft/punish-addon/releases/tag/nightly) или соберите его из исходников.
+2. Положите JAR в `plugins/React/addons/`. Нужен React с API 2.
+3. Перезапустите сервер или выполните `/react reboot addons`. Настройки появятся в `plugins/React/addons/ReactPunishAddon/`.
+
+React также может установить отсутствующий аддон из стабильного канала, когда доступен подписанный релиз для API 2.
+
 
 ## Сборка
 
-```bash
-./gradlew build
-```
+Для сборки используйте JDK 21. Выполните `./gradlew build` или `.\gradlew.bat build` на Windows.
 
-Готовый jar лежит в `common/build/libs/`.
+Готовый `punish-addon-*.jar` лежит в `common/build/libs/`.
+
 
 ## Лицензия
 
-См. [LICENSE](LICENSE).
+[MIT](LICENSE).
