@@ -3,7 +3,7 @@
 paper-api = "1.18.2-R0.1-SNAPSHOT"
 minecraft = "1.21.11"
 
-react = "f5773cd"
+react = "7a0f88b"
 actions = "2.2.0"
 schedula = "1.1.2"
 
