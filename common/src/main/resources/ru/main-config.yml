@@ -1,0 +1,36 @@
+settings:
+
+  # Команда: /react punish <тип> [анимация] <игроки> <причина>
+  command: punish
+
+types:
+
+  kick:
+
+    animation:
+      need-to-select-in-command: true
+      selected: holyworld
+
+    actions:
+      - '[console] kick {player.name} {reason}'
+
+  ban:
+
+    animation:
+      need-to-select-in-command: false
+      selected: holyworld
+
+    actions:
+      - '[console] ban {player.name} {reason}'
+
+  mute:
+
+    animation:
+      need-to-select-in-command: true
+      selected: holyworld
+
+    actions:
+      - '[console] mute {player.name} {reason}'
+
+# Не меняйте версию конфигурации.
+config-version: 1

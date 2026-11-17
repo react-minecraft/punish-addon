@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Manrope&weight=700&size=38&pause=1000&color=EB2544&background=FFFFFF00&center=true&vCenter=true&width=700&lines=Punish+Addon" alt="Punish Addon Typing SVG"/></a>
+<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Manrope&weight=700&size=38&pause=1000&color=D97706&background=FFFFFF00&center=true&vCenter=true&width=700&lines=Punish+Addon" alt="Punish Addon Typing SVG"/></a>
 
 <p>Наказания с анимацией для React</p>
 
@@ -34,7 +34,7 @@
 
 | Команда | Право |
 |---|---|
-| `/punish <тип> [анимация] <игроки> <причина>` | `react.punish.<тип>` |
+| `/react punish <тип> [анимация] <игроки> <причина>` | `react.punish.<тип>` |
 
 - Команда своя, на Cloud API плагина: её имя задаёт `settings.command`, плагин снимает её вместе с аддоном.
 - `<игроки>` — ник или селектор (`@a`, `@p`).
@@ -46,7 +46,7 @@
 
 ```yaml
 settings:
-  command: punish   # /punish; старый ключ argument-literal тоже читается
+  command: punish   # /react punish; старый ключ argument-literal тоже читается
 
 types:
   kick:
@@ -61,9 +61,9 @@ types:
 
 ## Установка
 
-1. Соберите аддон или скачайте jar из [GitHub Nightly](https://github.com/react-minecraft/punish-addon/releases/tag/nightly). Нужен React с API 2.
+1. Соберите аддон или скачайте jar из [GitHub Releases](https://github.com/react-minecraft/punish-addon/releases/latest). Нужен React с API 2.
 2. Положите `punish-addon-<версия>.jar` в `plugins/React/addons/`.
-3. Перезапустите сервер или выполните `/react reboot addons`. Конфиг появится в `plugins/React/addons/ReactPunishAddon/`.
+3. Перезапустите сервер или выполните `/react reboot addons`. Конфиг появится в `plugins/React/addons/punish-addon/`.
 
 ## Сборка
 

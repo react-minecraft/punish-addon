@@ -1,6 +1,6 @@
 settings:
 
-  # The command: /punish <type> [animation] <players> <reason>
+  # The command: /react punish <type> [animation] <players> <reason>
   command: punish
 
 types:
@@ -31,3 +31,6 @@ types:
 
     actions:
       - '[console] mute {player.name} {reason}'
+
+# Do not change the configuration version.
+config-version: 1

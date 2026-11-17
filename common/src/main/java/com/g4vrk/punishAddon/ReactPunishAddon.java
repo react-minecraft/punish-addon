@@ -10,6 +10,7 @@ import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
 import com.g4vrk.react.api.addon.JavaAddon;
+import com.g4vrk.react.api.config.ConfigMigrationChain;
 import com.g4vrk.react.api.event.Subscribe;
 import com.g4vrk.react.api.event.plugin.ReloadEvent;
 import com.g4vrk.schedula.task.TickSchedule;
@@ -23,10 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.serialize.SerializationException;
-import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -45,6 +44,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     private static final String MAIN_CONFIG = "main-config.yml";
     private static final String HOLYWORLD_CONFIG = "animations/holyworld.yml";
     private static final String DEFAULT_LABEL = "punish";
+    private static final ConfigMigrationChain MAIN_MIGRATIONS = ConfigMigrationChain.builder().step(root -> {
+        final ConfigurationNode settings = root.node("settings");
+        final ConfigurationNode command = settings.node("command");
+        if (command.virtual() && !settings.node("argument-literal").virtual()) {
+            command.from(settings.node("argument-literal"));
+        }
+    }).build();
 
     private final PendingActionManager pending = new PendingActionManager();
 
@@ -55,16 +61,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Override
     public void onEnable() {
 
-        saveDefaultResource(MAIN_CONFIG);
-        saveDefaultResource(HOLYWORLD_CONFIG);
-
         this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger());
         load();
 
         environment().listeners().register(this);
         registerCommand();
 
-        logger().info("Punish types: {}, command /{}", this.types.keySet(), this.label);
+        logger().info("Punish types: {}, command /react {}", this.types.keySet(), this.label);
 
     }
 
@@ -82,8 +85,6 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Subscribe
     public void onReload(final @NotNull ReloadEvent event) {
 
-        final String previous = this.label;
-
         try {
             load();
         } catch (final RuntimeException exception) {
@@ -92,7 +93,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         }
 
         environment().scheduler().schedule(() -> {
-            environment().commands().unregister(previous);
+            environment().commands().unregister(PunishCommand.ROOT);
             registerCommand();
         }, TickSchedule.instant());
 
@@ -162,8 +163,8 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     private void load() {
 
-        final CommentedConfigurationNode main = read(MAIN_CONFIG);
-        final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG);
+        final CommentedConfigurationNode main = read(MAIN_CONFIG, MAIN_MIGRATIONS);
+        final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG, ConfigMigrationChain.none());
         final ActionParser<Audience> parser = environment().actions();
 
         final Map<String, Sequence<Player>> animations = BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, actionRunner, pending, holyWorld);
@@ -172,8 +173,10 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         /*
          * Older configurations still use the argument-literal key for the command name.
          */
-        final String label = settings.node("command").getString(
-                settings.node("argument-literal").getString(DEFAULT_LABEL));
+        final String label = settings.node("command").getString(settings.node("argument-literal").getString(DEFAULT_LABEL)).trim();
+        if (!label.matches("[a-z0-9_-]+")) {
+            throw new IllegalArgumentException("settings.command must be a lowercase command literal");
+        }
 
         final Map<String, PunishType> types;
         try {
@@ -237,22 +240,21 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     }
 
-    private @NotNull CommentedConfigurationNode read(final @NotNull String name) {
+    private @NotNull CommentedConfigurationNode read(
+            final @NotNull String name,
+            final @NotNull ConfigMigrationChain migrations
+    ) {
 
+        final String language = "en".equalsIgnoreCase(System.getProperty("user.language")) ? "en" : "ru";
         try {
-            return YamlConfigurationLoader.builder().path(directory().resolve(name)).build().load();
+            return environment().configs().file(name, ConfigurationNode.class)
+                    .defaults(getClass().getClassLoader(), language + "/" + name)
+                    .migrations(migrations)
+                    .keepMissing()
+                    .build()
+                    .loadNode();
         } catch (final IOException exception) {
             throw new IllegalStateException("Could not load " + name, exception);
-        }
-
-    }
-
-    private void saveDefaultResource(final @NotNull String name) {
-
-        final Path path = directory().resolve(name);
-
-        if (!path.toFile().exists()) {
-            saveResource(name, false);
         }
 
     }
