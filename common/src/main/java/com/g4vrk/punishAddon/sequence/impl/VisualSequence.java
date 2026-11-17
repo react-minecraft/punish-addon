@@ -92,7 +92,14 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
     ) {
 
         return new DelegateSequenceSession(() -> {
-            final PendingActionManager.Action action = pending.track(source.getUniqueId(), onEnd);
+            final Consumer<Player> completion = target -> {
+                try {
+                    actionRunner.run(target, atEnd);
+                } finally {
+                    onEnd.accept(target);
+                }
+            };
+            final PendingActionManager.Action action = pending.track(source.getUniqueId(), completion);
             scheduleVisualSequence(
                     source,
                     action,
@@ -104,11 +111,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                         tick(source, tick);
                         actionRunner.run(source, thenTick);
                     },
-                    () -> {
-                        if (action.complete(source)) {
-                            actionRunner.run(source, atEnd);
-                        }
-                    }
+                    () -> action.complete(source)
             );
         });
 

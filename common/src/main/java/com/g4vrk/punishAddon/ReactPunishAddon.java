@@ -210,14 +210,21 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             }
 
             final List<String> lines = type.node("actions").getList(String.class, List.of());
+            if (lines.isEmpty()) {
+                throw new IllegalStateException(
+                        "Punishment type '" + id + "' has no configured actions"
+                );
+            }
+
             final List<ExecutableAction<? super Audience>> actions = new ArrayList<>(lines.size());
 
             for (final String line : lines) {
                 final ExecutableAction<? super Audience> action = parser.parse(line);
 
                 if (action == null) {
-                    logger().warn("Unknown action '{}' in punishment type '{}'", line, id);
-                    continue;
+                    throw new IllegalStateException(
+                            "Unknown action '" + line + "' in punishment type '" + id + "'"
+                    );
                 }
 
                 actions.add(action);
