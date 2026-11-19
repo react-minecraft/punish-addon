@@ -7,7 +7,7 @@ import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.schedula.task.scheduler.Scheduler;
-import com.g4vrk.schedula.task.TickSchedule;
+import com.g4vrk.functionalActions.ExecutableAction;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -16,6 +16,7 @@ import org.spongepowered.configurate.serialize.SerializationException;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -26,7 +27,6 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
     private final Function<List<String>, ExecutableActionList<? super Audience>> actionParser;
     private final PunishmentActionRunner actionRunner;
     private final PendingActionManager pending;
-    private final Scheduler scheduler;
 
     private ExecutableActionList<? super Audience> onStart;
     private ExecutableActionList<? super Audience> thenTick;
@@ -45,7 +45,6 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
         this.actionParser = actionParser;
         this.actionRunner = actionRunner;
         this.pending = pending;
-        this.scheduler = scheduler;
 
     }
 
@@ -91,31 +90,11 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
     @Override
     public @NotNull SequenceSession newSession(
             final @NotNull Player source,
-            final @NotNull Consumer<Player> onEnd
+            final @NotNull BiConsumer<Player, Iterable<? extends ExecutableAction<? super Audience>>> onEnd
     ) {
 
         return new DelegateSequenceSession(() -> {
-            final Consumer<Player> completion = target -> {
-                actionRunner.run(target, atEnd, () -> {
-                    final PendingActionManager.Action punishment = pending.track(target.getUniqueId(), onEnd);
-                    if (!target.isOnline()) {
-                        punishment.defer();
-                        return;
-                    }
-                    try {
-                        punishment.attach(scheduler.scheduleEntity(target, () -> {
-                            if (target.isOnline()) {
-                                punishment.complete(target);
-                            } else {
-                                punishment.defer();
-                            }
-                        }, TickSchedule.instant()));
-                    } catch (final RuntimeException | Error failure) {
-                        punishment.defer();
-                        throw failure;
-                    }
-                });
-            };
+            final Consumer<Player> completion = target -> onEnd.accept(target, atEnd);
             final PendingActionManager.Action action = pending.track(source.getUniqueId(), completion);
             scheduleVisualSequence(
                     source,

@@ -61,7 +61,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Override
     public void onEnable() {
 
-        this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger());
+        this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger(), this.pending);
         load();
 
         environment().listeners().register(this);
@@ -125,7 +125,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
         if (sequence == null) {
             logger().warn("Animation '{}' is unknown, punishing {} without it", context.animation(), player.getName());
-            final PendingActionManager.Action action = pending.track(player.getUniqueId(), target -> execute(target, context));
+            final PendingActionManager.Action action = pending.track(player.getUniqueId(), target -> execute(target, context, List.of()));
             try {
                 action.attach(environment().scheduler().scheduleEntity(player, () -> {
                     if (player.isOnline()) {
@@ -141,11 +141,15 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             return;
         }
 
-        sequence.newSession(player, target -> execute(target, context)).start();
+        sequence.newSession(player, (target, before) -> execute(target, context, before)).start();
 
     }
 
-    private void execute(final @NotNull Player player, final @NotNull PunishContext context) {
+    private void execute(
+            final @NotNull Player player,
+            final @NotNull PunishContext context,
+            final @NotNull Iterable<? extends ExecutableAction<? super Audience>> before
+    ) {
 
         final String name = player.getName();
         final String uuid = player.getUniqueId().toString();
@@ -157,7 +161,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
                 .replace("{context.input-after-type}", reason)
                 .replace("{reason}", reason);
 
-        actionRunner.run(player, context.punishType().actions(), placeholders);
+        actionRunner.runTracked(player, before, context.punishType().actions(), placeholders);
 
     }
 

@@ -129,11 +129,13 @@ public final class PendingActionManager {
 
         public boolean complete(final @NotNull Player target) {
 
-            if (!remove(this, true)) {
-                return false;
+            synchronized (PendingActionManager.this) {
+                if (!remove(this, true)) {
+                    return false;
+                }
+                completion.accept(target);
+                return true;
             }
-            completion.accept(target);
-            return true;
 
         }
 
