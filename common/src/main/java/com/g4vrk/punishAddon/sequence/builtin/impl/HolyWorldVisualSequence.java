@@ -1,5 +1,6 @@
 package com.g4vrk.punishAddon.sequence.builtin.impl;
 
+import com.cryptomorin.xseries.particles.XParticle;
 import com.g4vrk.functionalActions.list.ExecutableActionList;
 import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
@@ -22,7 +23,7 @@ import java.util.function.Function;
  */
 public final class HolyWorldVisualSequence extends VisualSequence {
 
-    private static final Particle DUST = dustParticle();
+    private static final Particle DUST = XParticle.DUST.get();
 
     private static final double TWO_PI = Math.PI * 2.0D;
 
@@ -42,16 +43,6 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     private double[] circleX;
     private double[] circleZ;
-
-    private static @NotNull Particle dustParticle() {
-
-        try {
-            return Particle.valueOf("DUST");
-        } catch (final IllegalArgumentException legacy) {
-            return Particle.valueOf("REDSTONE");
-        }
-
-    }
 
     public HolyWorldVisualSequence(
             final long duration,
