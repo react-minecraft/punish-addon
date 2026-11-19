@@ -249,24 +249,15 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
                     centerX
                             + finalX
-                            + random.nextDouble(
-                            -offset,
-                            offset
-                    ),
+                            + (random.nextDouble() * 2.0D - 1.0D) * offset,
 
                     centerY
                             + rotatedY
-                            + random.nextDouble(
-                            -offset,
-                            offset
-                    ),
+                            + (random.nextDouble() * 2.0D - 1.0D) * offset,
 
                     centerZ
                             + finalZ
-                            + random.nextDouble(
-                            -offset,
-                            offset
-                    ),
+                            + (random.nextDouble() * 2.0D - 1.0D) * offset,
 
                     1,
 
@@ -290,7 +281,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
     ) {
 
         final String hex =
-                value.charAt(0) == '#'
+                value.startsWith("#")
                         ? value.substring(1)
                         : value;
 

@@ -69,7 +69,11 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
                             onEnd.run();
                         }
                     } catch (final RuntimeException | Error failure) {
-                        action.discard();
+                        if (player.isOnline()) {
+                            action.complete(player);
+                        } else {
+                            action.defer();
+                        }
                         throw failure;
                     }
 
