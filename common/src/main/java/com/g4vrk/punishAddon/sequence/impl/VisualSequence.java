@@ -7,6 +7,7 @@ import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.schedula.task.scheduler.Scheduler;
+import com.g4vrk.schedula.task.TickSchedule;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -25,6 +26,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
     private final Function<List<String>, ExecutableActionList<? super Audience>> actionParser;
     private final PunishmentActionRunner actionRunner;
     private final PendingActionManager pending;
+    private final Scheduler scheduler;
 
     private ExecutableActionList<? super Audience> onStart;
     private ExecutableActionList<? super Audience> thenTick;
@@ -43,6 +45,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
         this.actionParser = actionParser;
         this.actionRunner = actionRunner;
         this.pending = pending;
+        this.scheduler = scheduler;
 
     }
 
@@ -93,11 +96,25 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
         return new DelegateSequenceSession(() -> {
             final Consumer<Player> completion = target -> {
-                try {
-                    actionRunner.run(target, atEnd);
-                } finally {
-                    onEnd.accept(target);
-                }
+                actionRunner.run(target, atEnd, () -> {
+                    final PendingActionManager.Action punishment = pending.track(target.getUniqueId(), onEnd);
+                    if (!target.isOnline()) {
+                        punishment.defer();
+                        return;
+                    }
+                    try {
+                        punishment.attach(scheduler.scheduleEntity(target, () -> {
+                            if (target.isOnline()) {
+                                punishment.complete(target);
+                            } else {
+                                punishment.defer();
+                            }
+                        }, TickSchedule.instant()));
+                    } catch (final RuntimeException | Error failure) {
+                        punishment.defer();
+                        throw failure;
+                    }
+                });
             };
             final PendingActionManager.Action action = pending.track(source.getUniqueId(), completion);
             scheduleVisualSequence(

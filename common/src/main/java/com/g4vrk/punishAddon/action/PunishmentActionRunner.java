@@ -19,6 +19,8 @@ public final class PunishmentActionRunner {
 
     private static final TickSchedule NEXT_TICK = TickSchedule.instant();
     private static final UnaryOperator<String> UNCHANGED = UnaryOperator.identity();
+    private static final Runnable NO_COMPLETION = () -> {
+    };
 
     private final Scheduler scheduler;
     private final Logger logger;
@@ -45,9 +47,32 @@ public final class PunishmentActionRunner {
             final @NotNull UnaryOperator<String> placeholders
     ) {
 
+        run(player, actions, placeholders, NO_COMPLETION);
+
+    }
+
+    public void run(
+            final @NotNull Player player,
+            final @NotNull Iterable<? extends ExecutableAction<? super Audience>> actions,
+            final @NotNull Runnable completion
+    ) {
+
+        run(player, actions, UNCHANGED, completion);
+
+    }
+
+    private void run(
+            final @NotNull Player player,
+            final @NotNull Iterable<? extends ExecutableAction<? super Audience>> actions,
+            final @NotNull UnaryOperator<String> placeholders,
+            final @NotNull Runnable completion
+    ) {
+
         final Iterator<? extends ExecutableAction<? super Audience>> remaining = actions.iterator();
         if (remaining.hasNext()) {
-            run(player, remaining.next(), remaining, placeholders, false);
+            run(player, remaining.next(), remaining, placeholders, false, completion);
+        } else {
+            completion.run();
         }
 
     }
@@ -57,7 +82,8 @@ public final class PunishmentActionRunner {
             final @NotNull ExecutableAction<? super Audience> first,
             final @NotNull Iterator<? extends ExecutableAction<? super Audience>> remaining,
             final @NotNull UnaryOperator<String> placeholders,
-            final boolean global
+            final boolean global,
+            final @NotNull Runnable completion
     ) {
 
         ExecutableAction<? super Audience> action = first;
@@ -65,7 +91,7 @@ public final class PunishmentActionRunner {
             final boolean requiresGlobal = action.action() instanceof UncontextualAction;
             if (requiresGlobal != global) {
                 final ExecutableAction<? super Audience> next = action;
-                final Runnable continuation = () -> run(player, next, remaining, placeholders, requiresGlobal);
+                final Runnable continuation = () -> run(player, next, remaining, placeholders, requiresGlobal, completion);
                 if (requiresGlobal) {
                     scheduler.schedule(continuation, NEXT_TICK);
                 } else {
@@ -79,6 +105,7 @@ public final class PunishmentActionRunner {
                 logger.error("Could not run a punishment action", failure);
             }
             if (!remaining.hasNext()) {
+                completion.run();
                 return;
             }
             action = remaining.next();
