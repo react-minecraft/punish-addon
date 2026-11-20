@@ -19,6 +19,9 @@ public record PunishType(
     public @Nullable Sequence<Player> sequence(
             final @NotNull String animationId
     ) {
+
         return this.animations.get(animationId);
+
     }
+
 }

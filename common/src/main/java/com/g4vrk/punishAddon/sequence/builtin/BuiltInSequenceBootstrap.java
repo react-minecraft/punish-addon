@@ -30,6 +30,7 @@ public final class BuiltInSequenceBootstrap {
             final @NotNull PendingActionManager pendingActionManager,
             final @NotNull ConfigurationNode holyWorldConfig
     ) {
+
         final BuiltInSequenceRegistry<Player> registry = new BuiltInSequenceRegistry<>();
 
         registry.register(
@@ -45,6 +46,7 @@ public final class BuiltInSequenceBootstrap {
         );
 
         return registry.all();
+
     }
 
 }
