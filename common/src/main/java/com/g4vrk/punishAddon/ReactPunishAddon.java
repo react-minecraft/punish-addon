@@ -57,6 +57,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     private PunishmentActionRunner actionRunner;
     private volatile Map<String, PunishType> types = Map.of();
     private volatile String label = DEFAULT_LABEL;
+    private volatile boolean disabled;
 
     @Override
     public void onEnable() {
@@ -74,6 +75,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Override
     public void onDisable() {
 
+        this.disabled = true;
         this.pending.clear();
 
     }
@@ -85,6 +87,9 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Subscribe
     public void onReload(final @NotNull ReloadEvent event) {
 
+        if (this.disabled) {
+            return;
+        }
         try {
             load();
         } catch (final RuntimeException exception) {
@@ -93,6 +98,9 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         }
 
         environment().scheduler().schedule(() -> {
+            if (this.disabled) {
+                return;
+            }
             environment().commands().unregister(PunishCommand.ROOT);
             registerCommand();
         }, TickSchedule.instant());

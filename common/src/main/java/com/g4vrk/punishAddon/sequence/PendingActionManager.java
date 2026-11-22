@@ -133,9 +133,9 @@ public final class PendingActionManager {
                 if (!remove(this, true)) {
                     return false;
                 }
-                completion.accept(target);
-                return true;
             }
+            completion.accept(target);
+            return true;
 
         }
 
