@@ -12,7 +12,7 @@ import java.util.Map;
 
 public record PunishType(
         @NotNull Map<String, Sequence<Player>> animations,
-        @NotNull AnimationSettings animation,
+        @NotNull AnimationConfig animation,
         @NotNull List<ExecutableAction<? super Audience>> actions
 ) {
 

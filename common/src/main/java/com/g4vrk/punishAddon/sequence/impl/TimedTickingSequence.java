@@ -4,7 +4,7 @@ import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
-import com.g4vrk.schedula.task.scheduler.Scheduler;
+import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -19,11 +19,11 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
     private static final TickSchedule TICK_SCHEDULE = TickSchedule.repeating(1, 1);
 
     private final long duration;
-    private final Scheduler scheduler;
+    private final TaskScheduler<Player> scheduler;
 
     protected TimedTickingSequence(
             final long duration,
-            final @NotNull Scheduler scheduler
+            final @NotNull TaskScheduler<Player> scheduler
     ) {
 
         this.duration = duration;

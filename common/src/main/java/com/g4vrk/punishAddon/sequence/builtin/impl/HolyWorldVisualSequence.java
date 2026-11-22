@@ -5,7 +5,7 @@ import com.g4vrk.functionalActions.list.ExecutableActionList;
 import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.impl.VisualSequence;
-import com.g4vrk.schedula.task.scheduler.Scheduler;
+import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.Color;
 import org.bukkit.Particle;
@@ -46,7 +46,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     public HolyWorldVisualSequence(
             final long duration,
-            final @NotNull Scheduler scheduler,
+            final @NotNull TaskScheduler<Player> scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
             final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pendingActionManager,

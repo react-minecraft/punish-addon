@@ -5,7 +5,7 @@ import com.g4vrk.functionalActions.impl.UncontextualAction;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
-import com.g4vrk.schedula.task.scheduler.Scheduler;
+import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -23,12 +23,12 @@ public final class PunishmentActionRunner {
     private static final TickSchedule NEXT_TICK = TickSchedule.instant();
     private static final UnaryOperator<String> UNCHANGED = UnaryOperator.identity();
 
-    private final Scheduler scheduler;
+    private final TaskScheduler<Player> scheduler;
     private final Logger logger;
     private final PendingActionManager pending;
 
     public PunishmentActionRunner(
-            final @NotNull Scheduler scheduler,
+            final @NotNull TaskScheduler<Player> scheduler,
             final @NotNull Logger logger,
             final @NotNull PendingActionManager pending
     ) {

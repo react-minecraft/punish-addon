@@ -5,7 +5,7 @@ import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.impl.HolyWorldVisualSequence;
-import com.g4vrk.schedula.task.scheduler.Scheduler;
+import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -24,7 +24,7 @@ public final class BuiltInSequenceBootstrap {
     }
 
     public static @NotNull Map<String, Sequence<Player>> bootstrap(
-            final @NotNull Scheduler scheduler,
+            final @NotNull TaskScheduler<Player> scheduler,
             final @NotNull ActionParser<Audience> actionParser,
             final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pendingActionManager,

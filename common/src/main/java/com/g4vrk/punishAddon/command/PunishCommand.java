@@ -3,11 +3,12 @@ package com.g4vrk.punishAddon.command;
 import com.g4vrk.punishAddon.PunishContext;
 import com.g4vrk.punishAddon.config.PunishType;
 import com.g4vrk.react.api.extension.command.CommandRegistrar;
-import org.bukkit.command.CommandSender;
+import com.g4vrk.react.api.platform.sender.PlatformSender;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
+import java.util.Collection;
+import io.leangen.geantyref.TypeToken;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
-import org.incendo.cloud.bukkit.data.MultiplePlayerSelector;
-import org.incendo.cloud.bukkit.parser.selector.MultiplePlayerSelectorParser;
 import org.incendo.cloud.context.CommandContext;
 import org.incendo.cloud.key.CloudKey;
 import org.incendo.cloud.parser.standard.StringParser;
@@ -27,7 +28,7 @@ public final class PunishCommand {
     public static final String TYPE_PERMISSION = "react.punish.";
     public static final String ROOT = "react";
 
-    private static final CloudKey<MultiplePlayerSelector> PLAYERS = CloudKey.of("players", MultiplePlayerSelector.class);
+    private static final CloudKey<Collection<PlatformPlayer>> PLAYERS = CloudKey.of("players", new TypeToken<Collection<PlatformPlayer>>() {});
     private static final CloudKey<String> REASON = CloudKey.of("reason", String.class);
 
     private final String label;
@@ -51,46 +52,47 @@ public final class PunishCommand {
         for (final Map.Entry<String, PunishType> entry : this.types.entrySet()) {
             final String type = entry.getKey();
             final PunishType settings = entry.getValue();
-            final Command.Builder<CommandSender> root = commands.command(ROOT)
+            final Command.Builder<PlatformSender> root = commands.command(ROOT)
                     .literal(this.label)
                     .literal(type)
                     .permission(TYPE_PERMISSION + type);
 
             if (!settings.animation().needToSelectInCommand()) {
-                commands.register(ROOT, withTarget(root, type, settings.animation().selected(), settings));
+                commands.register(ROOT, withTarget(commands, root, type, settings.animation().selected(), settings));
                 continue;
             }
 
             for (final String animation : settings.animations().keySet()) {
-                commands.register(ROOT, withTarget(root.literal(animation), type, animation, settings));
+                commands.register(ROOT, withTarget(commands, root.literal(animation), type, animation, settings));
             }
         }
 
     }
 
-    private Command.@NotNull Builder<CommandSender> withTarget(
-            final @NotNull Command.Builder<CommandSender> builder,
+    private Command.@NotNull Builder<PlatformSender> withTarget(
+            final @NotNull CommandRegistrar commands,
+            final @NotNull Command.Builder<PlatformSender> builder,
             final @NotNull String type,
             final @NotNull String animation,
             final @NotNull PunishType settings
     ) {
 
         return builder
-                .required(PLAYERS, MultiplePlayerSelectorParser.multiplePlayerSelectorParser())
+                .argument(commands.multiplePlayersArgument(PLAYERS, true))
                 .required(REASON, StringParser.greedyStringParser())
                 .handler(context -> run(context, new PunishContext(type, animation, context.get(REASON), settings)));
 
     }
 
     private void run(
-            final @NotNull CommandContext<CommandSender> context,
+            final @NotNull CommandContext<PlatformSender> context,
             final @NotNull PunishContext punishment
     ) {
 
-        final MultiplePlayerSelector players = context.get(PLAYERS);
+        final Collection<PlatformPlayer> players = context.get(PLAYERS);
 
-        for (final Player player : players.values()) {
-            this.punish.accept(player, punishment);
+        for (final PlatformPlayer player : players) {
+            this.punish.accept((Player) player.handle(), punishment);
         }
 
     }
