@@ -5,6 +5,7 @@ import com.g4vrk.functionalActions.list.ExecutableActionList;
 import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.impl.VisualSequence;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.Color;
@@ -46,7 +47,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     public HolyWorldVisualSequence(
             final long duration,
-            final @NotNull TaskScheduler<Player> scheduler,
+            final @NotNull TaskScheduler<PlatformPlayer> scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
             final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pendingActionManager,
@@ -160,19 +161,21 @@ public final class HolyWorldVisualSequence extends VisualSequence {
 
     @Override
     protected void start(
-            final @NotNull Player source
+            final @NotNull PlatformPlayer source
     ) {
 
-        source.addPotionEffect(PotionEffectType.LEVITATION.createEffect(Math.toIntExact(duration()), 1));
+        final Player player = requireBukkitPlayer(source);
+        player.addPotionEffect(PotionEffectType.LEVITATION.createEffect(Math.toIntExact(duration()), 1));
 
     }
 
     @Override
     protected void tick(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer platformPlayer,
             final long tick
     ) {
 
+        final Player player = requireBukkitPlayer(platformPlayer);
         final var center = player.getLocation();
 
         final double centerX =
@@ -320,6 +323,18 @@ public final class HolyWorldVisualSequence extends VisualSequence {
             );
 
         }
+
+    }
+
+    private static @NotNull Player requireBukkitPlayer(
+            final @NotNull PlatformPlayer player
+    ) {
+
+        final Player nativePlayer = player.unwrap(Player.class);
+        if (nativePlayer == null) {
+            throw new IllegalStateException("HolyWorld animation requires a Bukkit backed player");
+        }
+        return nativePlayer;
 
     }
 

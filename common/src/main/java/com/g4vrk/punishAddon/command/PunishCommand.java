@@ -7,7 +7,6 @@ import com.g4vrk.react.api.platform.sender.PlatformSender;
 import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import java.util.Collection;
 import io.leangen.geantyref.TypeToken;
-import org.bukkit.entity.Player;
 import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
 import org.incendo.cloud.key.CloudKey;
@@ -33,12 +32,12 @@ public final class PunishCommand {
 
     private final String label;
     private final Map<String, PunishType> types;
-    private final BiConsumer<Player, PunishContext> punish;
+    private final BiConsumer<PlatformPlayer, PunishContext> punish;
 
     public PunishCommand(
             final @NotNull String label,
             final @NotNull Map<String, PunishType> types,
-            final @NotNull BiConsumer<Player, PunishContext> punish
+            final @NotNull BiConsumer<PlatformPlayer, PunishContext> punish
     ) {
 
         this.label = label;
@@ -59,6 +58,11 @@ public final class PunishCommand {
 
             if (!settings.animation().needToSelectInCommand()) {
                 commands.register(ROOT, withTarget(commands, root, type, settings.animation().selected(), settings));
+                continue;
+            }
+
+            if (settings.animations().isEmpty()) {
+                commands.register(ROOT, withTarget(commands, root.literal(settings.animation().selected()), type, settings.animation().selected(), settings));
                 continue;
             }
 
@@ -92,7 +96,7 @@ public final class PunishCommand {
         final Collection<PlatformPlayer> players = context.get(PLAYERS);
 
         for (final PlatformPlayer player : players) {
-            this.punish.accept((Player) player.handle(), punishment);
+            this.punish.accept(player, punishment);
         }
 
     }

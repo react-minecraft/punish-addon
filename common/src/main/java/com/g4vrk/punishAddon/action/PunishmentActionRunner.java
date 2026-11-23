@@ -3,11 +3,11 @@ package com.g4vrk.punishAddon.action;
 import com.g4vrk.functionalActions.ExecutableAction;
 import com.g4vrk.functionalActions.impl.UncontextualAction;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -23,12 +23,12 @@ public final class PunishmentActionRunner {
     private static final TickSchedule NEXT_TICK = TickSchedule.instant();
     private static final UnaryOperator<String> UNCHANGED = UnaryOperator.identity();
 
-    private final TaskScheduler<Player> scheduler;
+    private final TaskScheduler<PlatformPlayer> scheduler;
     private final Logger logger;
     private final PendingActionManager pending;
 
     public PunishmentActionRunner(
-            final @NotNull TaskScheduler<Player> scheduler,
+            final @NotNull TaskScheduler<PlatformPlayer> scheduler,
             final @NotNull Logger logger,
             final @NotNull PendingActionManager pending
     ) {
@@ -43,7 +43,7 @@ public final class PunishmentActionRunner {
      * Runs the final animation and punishment actions as one resumable sequence.
      */
     public void runTracked(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> before,
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> punishment,
             final @NotNull UnaryOperator<String> placeholders
@@ -77,9 +77,9 @@ public final class PunishmentActionRunner {
 
         }
 
-        private synchronized void resume(final @NotNull Player player) {
+        private synchronized void resume(final @NotNull PlatformPlayer player) {
 
-            final PendingActionManager.Action action = pending.track(player.getUniqueId(), this::resume);
+            final PendingActionManager.Action action = pending.track(player.uniqueId(), this::resume);
             this.pendingAction = action;
             try {
                 action.attach(scheduler.scheduleEntity(player, () -> advance(player, action, false), NEXT_TICK));
@@ -91,10 +91,15 @@ public final class PunishmentActionRunner {
         }
 
         private synchronized void advance(
-                final @NotNull Player player,
+                final @NotNull PlatformPlayer player,
                 final @NotNull PendingActionManager.Action action,
                 final boolean global
         ) {
+
+            if (!player.online()) {
+                action.defer();
+                return;
+            }
 
             while (this.pendingAction == action && action.active()) {
                 if (this.current == null) {
@@ -138,7 +143,7 @@ public final class PunishmentActionRunner {
     }
 
     public void run(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> actions
     ) {
 
@@ -147,7 +152,7 @@ public final class PunishmentActionRunner {
     }
 
     public void run(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> actions,
             final @NotNull UnaryOperator<String> placeholders
     ) {
@@ -160,7 +165,7 @@ public final class PunishmentActionRunner {
     }
 
     private void run(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull ExecutableAction<? super Audience> first,
             final @NotNull Iterator<? extends ExecutableAction<? super Audience>> remaining,
             final @NotNull UnaryOperator<String> placeholders,

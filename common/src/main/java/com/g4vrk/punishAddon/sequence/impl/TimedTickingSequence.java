@@ -2,10 +2,10 @@ package com.g4vrk.punishAddon.sequence.impl;
 
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Consumer;
@@ -14,16 +14,16 @@ import java.util.function.LongConsumer;
 /**
  * Runs an animation from start to completion on the target player's entity scheduler.
  */
-public abstract class TimedTickingSequence implements Sequence<Player> {
+public abstract class TimedTickingSequence implements Sequence<PlatformPlayer> {
 
     private static final TickSchedule TICK_SCHEDULE = TickSchedule.repeating(1, 1);
 
     private final long duration;
-    private final TaskScheduler<Player> scheduler;
+    private final TaskScheduler<PlatformPlayer> scheduler;
 
     protected TimedTickingSequence(
             final long duration,
-            final @NotNull TaskScheduler<Player> scheduler
+            final @NotNull TaskScheduler<PlatformPlayer> scheduler
     ) {
 
         this.duration = duration;
@@ -32,7 +32,7 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
     }
 
     protected final void scheduleVisualSequence(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull PendingActionManager.Action action,
             final @NotNull Runnable onStart,
             final @NotNull LongConsumer onTick,
@@ -48,7 +48,7 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
                 @Override
                 public void accept(final @NotNull Task current) {
 
-                    if (!action.active() || !player.isOnline()) {
+                    if (!action.active() || !player.online()) {
                         action.defer();
                         current.cancel();
                         return;
@@ -69,7 +69,7 @@ public abstract class TimedTickingSequence implements Sequence<Player> {
                             onEnd.run();
                         }
                     } catch (final RuntimeException | Error failure) {
-                        if (player.isOnline()) {
+                        if (player.online()) {
                             action.complete(player);
                         } else {
                             action.defer();

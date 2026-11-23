@@ -1,7 +1,7 @@
 package com.g4vrk.punishAddon.sequence;
 
 import com.g4vrk.schedula.task.Task;
-import org.bukkit.entity.Player;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,7 +20,7 @@ public final class PendingActionManager {
     private final Map<UUID, List<Action>> pending = new HashMap<>();
     private boolean closed;
 
-    public synchronized @NotNull Action track(final @NotNull UUID player, final @NotNull Consumer<Player> completion) {
+    public synchronized @NotNull Action track(final @NotNull UUID player, final @NotNull Consumer<PlatformPlayer> completion) {
 
         if (closed) {
             throw new IllegalStateException("The punishment addon is disabled");
@@ -40,11 +40,11 @@ public final class PendingActionManager {
 
     }
 
-    public void thenJoin(final @NotNull Player player) {
+    public void thenJoin(final @NotNull PlatformPlayer player) {
 
         final List<Action> actions;
         synchronized (this) {
-            actions = pending.remove(player.getUniqueId());
+            actions = pending.remove(player.uniqueId());
             if (actions != null) {
                 actions.forEach(Action::defer);
             }
@@ -90,11 +90,11 @@ public final class PendingActionManager {
     public final class Action {
 
         private final UUID player;
-        private final Consumer<Player> completion;
+        private final Consumer<PlatformPlayer> completion;
         private @Nullable Task task;
         private volatile boolean active = true;
 
-        private Action(final @NotNull UUID player, final @NotNull Consumer<Player> completion) {
+        private Action(final @NotNull UUID player, final @NotNull Consumer<PlatformPlayer> completion) {
 
             this.player = player;
             this.completion = completion;
@@ -127,7 +127,7 @@ public final class PendingActionManager {
 
         }
 
-        public boolean complete(final @NotNull Player target) {
+        public boolean complete(final @NotNull PlatformPlayer target) {
 
             synchronized (PendingActionManager.this) {
                 if (!remove(this, true)) {

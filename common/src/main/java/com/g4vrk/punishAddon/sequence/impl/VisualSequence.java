@@ -3,13 +3,13 @@ package com.g4vrk.punishAddon.sequence.impl;
 import com.g4vrk.functionalActions.list.ExecutableActionList;
 import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.punishAddon.sequence.SequenceSession;
 import com.g4vrk.punishAddon.sequence.impl.session.DelegateSequenceSession;
 import com.g4vrk.react.api.ReloadObserver;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import com.g4vrk.functionalActions.ExecutableAction;
 import net.kyori.adventure.audience.Audience;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.serialize.SerializationException;
@@ -34,7 +34,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
     protected VisualSequence(
             final long duration,
-            final @NotNull TaskScheduler<Player> scheduler,
+            final @NotNull TaskScheduler<PlatformPlayer> scheduler,
             final @NotNull Function<List<String>, ExecutableActionList<? super Audience>> actionParser,
             final @NotNull PunishmentActionRunner actionRunner,
             final @NotNull PendingActionManager pending
@@ -89,13 +89,13 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
     @Override
     public @NotNull SequenceSession newSession(
-            final @NotNull Player source,
-            final @NotNull BiConsumer<Player, Iterable<? extends ExecutableAction<? super Audience>>> onEnd
+            final @NotNull PlatformPlayer source,
+            final @NotNull BiConsumer<PlatformPlayer, Iterable<? extends ExecutableAction<? super Audience>>> onEnd
     ) {
 
         return new DelegateSequenceSession(() -> {
-            final Consumer<Player> completion = target -> onEnd.accept(target, atEnd);
-            final PendingActionManager.Action action = pending.track(source.getUniqueId(), completion);
+            final Consumer<PlatformPlayer> completion = target -> onEnd.accept(target, atEnd);
+            final PendingActionManager.Action action = pending.track(source.uniqueId(), completion);
             scheduleVisualSequence(
                     source,
                     action,
@@ -114,11 +114,11 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
     }
 
     protected abstract void start(
-            final @NotNull Player source
+            final @NotNull PlatformPlayer source
     );
 
     protected abstract void tick(
-            final @NotNull Player source,
+            final @NotNull PlatformPlayer source,
             final long tick
     );
 

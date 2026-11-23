@@ -13,13 +13,10 @@ import com.g4vrk.react.api.addon.JavaAddon;
 import com.g4vrk.react.api.config.migration.ConfigMigrationChain;
 import com.g4vrk.react.api.event.bus.Subscribe;
 import com.g4vrk.react.api.event.plugin.ReloadEvent;
+import com.g4vrk.react.api.platform.player.PlatformPlayer;
+import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
 import net.kyori.adventure.audience.Audience;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -36,10 +33,10 @@ import java.util.function.UnaryOperator;
 /**
  * Punishes players with a command and plays an animation over them first.
  *
- * <p>The command, the join listener and the reload subscription all go through the addon
- * environment, so the plugin removes them when the addon is disabled.</p>
+ * <p>The command and reload subscription belong to the addon environment. Deferred actions are
+ * resumed from the platform's online-player view.</p>
  */
-public final class ReactPunishAddon extends JavaAddon implements Listener {
+public final class ReactPunishAddon extends JavaAddon {
 
     private static final String MAIN_CONFIG = "main-config.yml";
     private static final String HOLYWORLD_CONFIG = "animations/holyworld.yml";
@@ -55,6 +52,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     private final PendingActionManager pending = new PendingActionManager();
 
     private PunishmentActionRunner actionRunner;
+    private Task reconnectMonitor;
     private volatile Map<String, PunishType> types = Map.of();
     private volatile String label = DEFAULT_LABEL;
     private volatile boolean disabled;
@@ -62,10 +60,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     @Override
     public void onEnable() {
 
-        this.actionRunner = new PunishmentActionRunner(environment().scheduler().<Player>mapEntity(environment().platform()::adaptPlayer), logger(), this.pending);
+        this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger(), this.pending);
         load();
-
-        environment().listeners().register(this);
+        this.reconnectMonitor = environment().scheduler().schedule(() -> {
+            for (final PlatformPlayer player : environment().platform().onlinePlayers()) {
+                this.pending.thenJoin(player);
+            }
+        }, TickSchedule.repeating(20, 20));
         registerCommand();
 
         logger().info("Punish types: {}, command /react {}", this.types.keySet(), this.label);
@@ -77,6 +78,10 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
         this.disabled = true;
         this.pending.clear();
+        if (this.reconnectMonitor != null) {
+            this.reconnectMonitor.cancel();
+            this.reconnectMonitor = null;
+        }
 
     }
 
@@ -97,7 +102,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
             return;
         }
 
-        environment().scheduler().<Player>mapEntity(environment().platform()::adaptPlayer).schedule(() -> {
+        environment().scheduler().schedule(() -> {
             if (this.disabled) {
                 return;
             }
@@ -107,36 +112,22 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     }
 
-    @EventHandler
-    public void onJoin(final @NotNull PlayerJoinEvent event) {
-
-        this.pending.thenJoin(event.getPlayer());
-
-    }
-
-    @EventHandler
-    public void onQuit(final @NotNull PlayerQuitEvent event) {
-
-        this.pending.onQuit(event.getPlayer().getUniqueId());
-
-    }
-
     private void registerCommand() {
 
         new PunishCommand(this.label, this.types, this::punish).register(environment().commands());
 
     }
 
-    private void punish(final @NotNull Player player, final @NotNull PunishContext context) {
+    private void punish(final @NotNull PlatformPlayer player, final @NotNull PunishContext context) {
 
-        final Sequence<Player> sequence = context.punishType().sequence(context.animation());
+        final Sequence<PlatformPlayer> sequence = context.punishType().sequence(context.animation());
 
         if (sequence == null) {
-            logger().warn("Animation '{}' is unknown, punishing {} without it", context.animation(), player.getName());
-            final PendingActionManager.Action action = pending.track(player.getUniqueId(), target -> execute(target, context, List.of()));
+            logger().warn("Animation '{}' is unavailable, punishing {} without it", context.animation(), player.name());
+            final PendingActionManager.Action action = pending.track(player.uniqueId(), target -> execute(target, context, List.of()));
             try {
-                action.attach(environment().scheduler().<Player>mapEntity(environment().platform()::adaptPlayer).scheduleEntity(player, () -> {
-                    if (player.isOnline()) {
+                action.attach(environment().scheduler().scheduleEntity(player, () -> {
+                    if (player.online()) {
                         action.complete(player);
                     } else {
                         action.defer();
@@ -154,13 +145,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
     }
 
     private void execute(
-            final @NotNull Player player,
+            final @NotNull PlatformPlayer player,
             final @NotNull PunishContext context,
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> before
     ) {
 
-        final String name = player.getName();
-        final String uuid = player.getUniqueId().toString();
+        final String name = player.name();
+        final String uuid = player.uniqueId().toString();
         final String reason = context.reason();
 
         final UnaryOperator<String> placeholders = input -> input == null ? null : input
@@ -179,7 +170,13 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
         final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG, ConfigMigrationChain.none());
         final ActionParser<Audience> parser = environment().actions();
 
-        final Map<String, Sequence<Player>> animations = BuiltInSequenceBootstrap.bootstrap(environment().scheduler().<Player>mapEntity(environment().platform()::adaptPlayer), parser, actionRunner, pending, holyWorld);
+        final boolean supportsHolyWorld = environment().platform().platformName().equals("paper");
+        if (!supportsHolyWorld) {
+            logger().warn("The HolyWorld animation is unavailable on {}; punishments will run without its visual effects", environment().platform().platformName());
+        }
+        final Map<String, Sequence<PlatformPlayer>> animations = supportsHolyWorld
+                ? BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, actionRunner, pending, holyWorld)
+                : Map.of();
 
         final ConfigurationNode settings = main.node("settings");
         /*
@@ -204,7 +201,7 @@ public final class ReactPunishAddon extends JavaAddon implements Listener {
 
     private @NotNull Map<String, PunishType> loadTypes(
             final @NotNull ConfigurationNode node,
-            final @NotNull Map<String, Sequence<Player>> animations,
+            final @NotNull Map<String, Sequence<PlatformPlayer>> animations,
             final @NotNull ActionParser<Audience> parser
     ) throws SerializationException {
 
