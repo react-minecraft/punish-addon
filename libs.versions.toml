@@ -4,8 +4,8 @@ paper-api = "1.18.2-R0.1-SNAPSHOT"
 minecraft = "1.21.11"
 
 react = "df00c45"
-actions = "a0508d1"
-schedula = "b902674126"
+actions = "2.2.1"
+schedula = "2.0.0"
 
 packetevents = "2.13.0"
 configurate = "4.2.0"
