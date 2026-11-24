@@ -170,7 +170,8 @@ public final class ReactPunishAddon extends JavaAddon {
         final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG, ConfigMigrationChain.none());
         final ActionParser<Audience> parser = environment().actions();
 
-        final boolean supportsHolyWorld = environment().platform().platformName().equals("paper");
+        final String platformName = environment().platform().platformName();
+        final boolean supportsHolyWorld = platformName.equals("paper") || platformName.equals("bukkit");
         if (!supportsHolyWorld) {
             logger().warn("The HolyWorld animation is unavailable on {}; punishments will run without its visual effects", environment().platform().platformName());
         }
