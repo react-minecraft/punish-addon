@@ -9,9 +9,6 @@ repositories {
 
 dependencies {
 
-    compileOnly(libs.paper.api)
-    compileOnly(libs.xseries)
-
     compileOnly(libs.react.api)
     compileOnly(libs.react.common)
     compileOnly(libs.actions)
@@ -19,14 +16,14 @@ dependencies {
 
     compileOnly(libs.cloud.paper)
     compileOnly(libs.configurate.yaml)
-    compileOnly(libs.packetevents)
+    compileOnly("net.kyori:adventure-api:4.20.0")
+    compileOnly("org.slf4j:slf4j-api:2.0.16")
 
-    testImplementation(libs.paper.api)
     testImplementation(libs.react.api)
     testImplementation(libs.actions)
     testImplementation(libs.schedula.common)
     testImplementation(libs.configurate.yaml)
-    testImplementation(libs.packetevents)
+    testImplementation("net.kyori:adventure-api:4.20.0")
     testImplementation("org.slf4j:slf4j-api:2.0.16")
 
 }

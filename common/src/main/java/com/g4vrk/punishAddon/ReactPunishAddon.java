@@ -18,7 +18,9 @@ import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.TickSchedule;
 import net.kyori.adventure.audience.Audience;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.serialize.SerializationException;
@@ -26,9 +28,9 @@ import org.spongepowered.configurate.serialize.SerializationException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -38,6 +40,7 @@ import java.util.ServiceLoader;
  * <p>The command and reload subscription belong to the addon environment. Deferred actions are
  * resumed from the platform's online-player view.</p>
  */
+@ApiStatus.Internal
 public final class ReactPunishAddon extends JavaAddon {
 
     private static final String MAIN_CONFIG = "main-config.yml";
@@ -51,37 +54,44 @@ public final class ReactPunishAddon extends JavaAddon {
         }
     }).build();
 
-    private final PendingActionManager pending = new PendingActionManager();
+    private final Object lifecycleLock = new Object();
 
+    private PendingActionManager pending;
     private PunishmentActionRunner actionRunner;
+    private HolyWorldRenderer renderer;
     private Task reconnectMonitor;
-    private volatile Map<String, PunishType> types = Map.of();
-    private volatile String label = DEFAULT_LABEL;
+    private volatile LoadedSettings settings = new LoadedSettings(DEFAULT_LABEL, Map.of());
     private volatile boolean disabled;
 
     @Override
     public void onEnable() {
 
+        this.pending = new PendingActionManager(logger());
         this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger(), this.pending);
-        load();
+        this.renderer = loadRenderer();
+        final LoadedSettings initial = load();
         this.reconnectMonitor = environment().scheduler().schedule(
                 () -> this.pending.pollOnline(environment().platform().onlinePlayers()),
                 TickSchedule.repeating(20, 20)
         );
-        registerCommand();
-
-        logger().info("Punish types: {}, command /react {}", this.types.keySet(), this.label);
+        environment().listeners().register(this);
+        registerCommand(initial);
+        logger().info("Punish types: {}, command /react {}", initial.types().keySet(), initial.label());
 
     }
 
     @Override
     public void onDisable() {
 
-        this.disabled = true;
-        this.pending.clear();
-        if (this.reconnectMonitor != null) {
-            this.reconnectMonitor.cancel();
-            this.reconnectMonitor = null;
+        synchronized (this.lifecycleLock) {
+            this.disabled = true;
+            if (this.pending != null) {
+                this.pending.clear();
+            }
+            if (this.reconnectMonitor != null) {
+                this.reconnectMonitor.cancel();
+                this.reconnectMonitor = null;
+            }
         }
 
     }
@@ -91,44 +101,53 @@ public final class ReactPunishAddon extends JavaAddon {
      * literals are the type and animation ids.
      */
     @Subscribe
-    public void onReload(final @NotNull ReloadEvent event) {
+    public void onReload(
+            final @NotNull ReloadEvent event
+    ) {
 
-        if (this.disabled) {
-            return;
-        }
-        try {
-            load();
-        } catch (final RuntimeException exception) {
-            logger().error("Could not reload the punish addon, keeping the old settings", exception);
-            return;
-        }
-
-        environment().scheduler().schedule(() -> {
+        synchronized (this.lifecycleLock) {
             if (this.disabled) {
                 return;
             }
-            environment().commands().unregister(PunishCommand.ROOT);
-            registerCommand();
-        }, TickSchedule.instant());
+            final LoadedSettings reloaded;
+            try {
+                reloaded = load();
+            } catch (final RuntimeException exception) {
+                logger().error("Could not reload the punish addon, keeping the old settings", exception);
+                return;
+            }
+            environment().scheduler().schedule(() -> {
+                synchronized (this.lifecycleLock) {
+                    if (this.disabled) {
+                        return;
+                    }
+                    environment().commands().unregister(PunishCommand.ROOT);
+                    registerCommand(reloaded);
+                }
+            }, TickSchedule.instant());
+        }
 
     }
 
-    private void registerCommand() {
+    private void registerCommand(
+            final @NotNull LoadedSettings current
+    ) {
 
-        new PunishCommand(this.label, this.types, this::punish).register(environment().commands());
+        new PunishCommand(current.label(), current.types(), this::punish).register(environment().commands());
 
     }
 
-    private void punish(final @NotNull PlatformPlayer player, final @NotNull PunishContext context) {
+    private void punish(
+            final @NotNull PlatformPlayer player,
+            final @NotNull PunishContext context
+    ) {
 
         final Sequence<PlatformPlayer> sequence = context.punishType().sequence(context.animation());
-
         if (sequence == null) {
             logger().warn("Animation '{}' is unavailable, punishing {} without it", context.animation(), player.name());
             execute(player, context, List.of());
             return;
         }
-
         sequence.newSession(player, (target, before) -> execute(target, context, before)).start();
 
     }
@@ -145,8 +164,7 @@ public final class ReactPunishAddon extends JavaAddon {
                 "{context.input-after-type}", context.reason(),
                 "{reason}", context.reason()
         );
-
-        actionRunner.runTracked(
+        this.actionRunner.runTracked(
                 player,
                 before,
                 context.punishType().actions(),
@@ -155,8 +173,8 @@ public final class ReactPunishAddon extends JavaAddon {
 
     }
 
-    private static String replacePlaceholders(
-            final String input,
+    private static @Nullable String replacePlaceholders(
+            final @Nullable String input,
             final @NotNull Map<String, String> placeholders
     ) {
 
@@ -190,11 +208,7 @@ public final class ReactPunishAddon extends JavaAddon {
 
     }
 
-    private void load() {
-
-        final CommentedConfigurationNode main = read(MAIN_CONFIG, MAIN_MIGRATIONS);
-        final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG, ConfigMigrationChain.none());
-        final ActionParser<Audience> parser = environment().actions();
+    private @NotNull HolyWorldRenderer loadRenderer() {
 
         final String platformName = environment().platform().platformName();
         final Iterator<HolyWorldRenderer> renderers = ServiceLoader.load(
@@ -206,34 +220,48 @@ public final class ReactPunishAddon extends JavaAddon {
                     "No HolyWorld renderer is installed for platform '" + platformName + "'"
             );
         }
-        final HolyWorldRenderer renderer = renderers.next();
+        final HolyWorldRenderer loaded = renderers.next();
         if (renderers.hasNext()) {
             throw new IllegalStateException(
                     "Multiple HolyWorld renderers are installed for platform '" + platformName + "'"
             );
         }
-        final Map<String, Sequence<PlatformPlayer>> animations = BuiltInSequenceBootstrap.bootstrap(
-                environment().scheduler(), parser, actionRunner, pending, holyWorld, renderer
-        );
+        return loaded;
 
-        final ConfigurationNode settings = main.node("settings");
+    }
+
+    private @NotNull LoadedSettings load() {
+
+        final CommentedConfigurationNode main = read(MAIN_CONFIG, MAIN_MIGRATIONS);
+        final CommentedConfigurationNode holyWorld = read(HOLYWORLD_CONFIG, ConfigMigrationChain.none());
+        final ActionParser<Audience> parser = environment().actions();
+        final Map<String, Sequence<PlatformPlayer>> animations = BuiltInSequenceBootstrap.bootstrap(
+                environment().scheduler(),
+                parser,
+                this.actionRunner,
+                this.pending,
+                holyWorld,
+                this.renderer
+        );
+        final ConfigurationNode settingsNode = main.node("settings");
         /*
          * Older configurations still use the argument-literal key for the command name.
          */
-        final String label = settings.node("command").getString(settings.node("argument-literal").getString(DEFAULT_LABEL)).trim();
+        final String label = settingsNode.node("command")
+                .getString(settingsNode.node("argument-literal").getString(DEFAULT_LABEL))
+                .trim();
         if (!label.matches("[a-z0-9_-]+")) {
             throw new IllegalArgumentException("settings.command must be a lowercase command literal");
         }
-
         final Map<String, PunishType> types;
         try {
             types = loadTypes(main.node("types"), animations, parser);
         } catch (final SerializationException exception) {
             throw new IllegalStateException("Could not read the punishment types", exception);
         }
-
-        this.types = types;
-        this.label = label;
+        final LoadedSettings loaded = new LoadedSettings(label, types);
+        this.settings = loaded;
+        return loaded;
 
     }
 
@@ -244,45 +272,35 @@ public final class ReactPunishAddon extends JavaAddon {
     ) throws SerializationException {
 
         final Map<String, PunishType> types = new LinkedHashMap<>();
-
         for (final Map.Entry<Object, ? extends ConfigurationNode> entry : node.childrenMap().entrySet()) {
             final String id = String.valueOf(entry.getKey());
             final ConfigurationNode type = entry.getValue();
             final ConfigurationNode animation = type.node("animation");
-
-            final AnimationConfig settings = new AnimationConfig(
+            final AnimationConfig animationConfig = new AnimationConfig(
                     animation.node("need-to-select-in-command").getBoolean(false),
                     animation.node("selected").getString(BuiltInSequenceBootstrap.HOLYWORLD)
             );
-
-            if (!settings.needToSelectInCommand() && !animations.containsKey(settings.selected())) {
-                logger().warn("Type '{}' selects the unknown animation '{}'", id, settings.selected());
+            if (!animationConfig.needToSelectInCommand() && !animations.containsKey(animationConfig.selected())) {
+                logger().warn("Type '{}' selects the unknown animation '{}'", id, animationConfig.selected());
             }
-
             final List<String> lines = type.node("actions").getList(String.class, List.of());
             if (lines.isEmpty()) {
                 throw new IllegalStateException(
                         "Punishment type '" + id + "' has no configured actions"
                 );
             }
-
             final List<ExecutableAction<? super Audience>> actions = new ArrayList<>(lines.size());
-
             for (final String line : lines) {
                 final ExecutableAction<? super Audience> action = parser.parse(line);
-
                 if (action == null) {
                     throw new IllegalStateException(
                             "Unknown action '" + line + "' in punishment type '" + id + "'"
                     );
                 }
-
                 actions.add(action);
             }
-
-            types.put(id, new PunishType(animations, settings, List.copyOf(actions)));
+            types.put(id, new PunishType(animations, animationConfig, List.copyOf(actions)));
         }
-
         return Collections.unmodifiableMap(types);
 
     }
@@ -303,6 +321,13 @@ public final class ReactPunishAddon extends JavaAddon {
         } catch (final IOException exception) {
             throw new IllegalStateException("Could not load " + name, exception);
         }
+
+    }
+
+    private record LoadedSettings(
+            @NotNull String label,
+            @NotNull Map<String, PunishType> types
+    ) {
 
     }
 

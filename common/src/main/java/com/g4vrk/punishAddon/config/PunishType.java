@@ -4,6 +4,7 @@ import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.functionalActions.ExecutableAction;
 import net.kyori.adventure.audience.Audience;
 import com.g4vrk.react.api.platform.player.PlatformPlayer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -13,6 +14,7 @@ import java.util.Map;
 /**
  * Configured punishment type binding animations and actions.
  */
+@ApiStatus.AvailableSince("1.0")
 public record PunishType(
         @NotNull Map<String, Sequence<PlatformPlayer>> animations,
         @NotNull AnimationConfig animation,

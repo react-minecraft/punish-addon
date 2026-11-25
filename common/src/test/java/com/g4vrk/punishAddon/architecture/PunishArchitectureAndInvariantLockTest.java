@@ -7,6 +7,7 @@
 package com.g4vrk.punishAddon.architecture;
 
 import com.g4vrk.functionalActions.ExecutableAction;
+import com.g4vrk.functionalActions.impl.UncontextualAction;
 import com.g4vrk.functionalActions.list.ExecutableActionList;
 import com.g4vrk.punishAddon.action.PunishmentActionRunner;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
@@ -19,11 +20,11 @@ import com.g4vrk.schedula.task.Task;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.slf4j.helpers.NOPLogger;
 import org.spongepowered.configurate.BasicConfigurationNode;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
@@ -35,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -54,7 +56,7 @@ final class PunishArchitectureAndInvariantLockTest {
     private static final Pattern IMPORT_PATTERN = Pattern.compile("^import\\s+(?:static\\s+)?([\\w.*]+);", Pattern.MULTILINE);
 
     @Test
-    void sourcesRemainFreeOfFastutilEmptyDirsWildcardsAndSingleLineComments() throws IOException {
+    void sourcesRemainFreeOfFastutilEmptyDirsWildcardsAndBukkitLeaks() throws IOException {
 
         final Path repo = repoRoot();
         final List<String> violations = new ArrayList<>();
@@ -71,9 +73,8 @@ final class PunishArchitectureAndInvariantLockTest {
                         violations.add(file.getFileName() + " leaks Fastutil " + imported);
                     }
                 }
-                if (!file.toString().contains("builtin" + File.separator + "impl")
-                        && content.contains("import org.bukkit.")) {
-                    violations.add(file.getFileName() + " leaks Bukkit outside builtin/impl");
+                if (content.contains("import org.bukkit.")) {
+                    violations.add(file.getFileName() + " leaks Bukkit into common");
                 }
             }
         }
@@ -93,17 +94,18 @@ final class PunishArchitectureAndInvariantLockTest {
     @Test
     void pendingActionPollDoesNotInterruptActiveOnlineAnimationsAndResumesDeferredOnce() {
 
-        final PendingActionManager manager = new PendingActionManager();
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
         final UUID playerId = UUID.randomUUID();
         final AtomicBoolean onlineFlag = new AtomicBoolean(true);
-        final PlatformPlayer firstSession = proxyPlayer(playerId, onlineFlag);
+        final PlatformPlayer firstSession = proxyPlayer(playerId, onlineFlag, 10);
         final AtomicInteger completions = new AtomicInteger();
         final AtomicBoolean taskCancelled = new AtomicBoolean();
         final PendingActionManager.Action active = manager.track(firstSession, target -> completions.incrementAndGet());
         active.attach(dummyTask(taskCancelled));
 
-        manager.pollOnline(List.of(firstSession));
-        assertTrue(active.active(), "Online poll must not defer an active animation");
+        final PlatformPlayer sameSessionWrapper = proxyPlayer(playerId, onlineFlag, 10);
+        manager.pollOnline(List.of(sameSessionWrapper));
+        assertTrue(active.active(), "Online poll with a new wrapper for the same entity must not defer an active animation");
         assertFalse(taskCancelled.get(), "Online poll must not cancel an active animation task");
         assertEquals(0, completions.get());
 
@@ -114,7 +116,7 @@ final class PunishArchitectureAndInvariantLockTest {
         assertTrue(taskCancelled.get(), "Going offline must cancel the animation task and defer completion");
 
         onlineFlag.set(true);
-        final PlatformPlayer rejoined = proxyPlayer(playerId, onlineFlag);
+        final PlatformPlayer rejoined = proxyPlayer(playerId, onlineFlag, 11);
         manager.pollOnline(List.of(rejoined));
         manager.pollOnline(List.of(rejoined));
         assertEquals(1, completions.get(), "Deferred action must execute exactly once upon reconnect");
@@ -131,20 +133,74 @@ final class PunishArchitectureAndInvariantLockTest {
     @Test
     void reconnectDuringSamePollIntervalDetectsReplacedPlayerSessionWithoutDoubleCompletion() {
 
-        final PendingActionManager manager = new PendingActionManager();
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
         final UUID playerId = UUID.randomUUID();
         final AtomicBoolean oldOnline = new AtomicBoolean(false);
-        final PlatformPlayer oldHandle = proxyPlayer(playerId, oldOnline);
+        final PlatformPlayer oldHandle = proxyPlayer(playerId, oldOnline, 10);
         final AtomicBoolean taskCancelled = new AtomicBoolean();
         final AtomicInteger completions = new AtomicInteger();
         final PendingActionManager.Action action = manager.track(oldHandle, target -> completions.incrementAndGet());
         action.attach(dummyTask(taskCancelled));
 
-        final PlatformPlayer newHandle = proxyPlayer(playerId, new AtomicBoolean(true));
+        final PlatformPlayer newHandle = proxyPlayer(playerId, new AtomicBoolean(true), 11);
         manager.pollOnline(List.of(newHandle));
         assertTrue(taskCancelled.get());
         assertEquals(1, completions.get());
         assertFalse(action.complete(newHandle));
+
+    }
+
+    @Test
+    void pollOnlineContinuesResumingOtherPlayersWhenOneCompletionFails() {
+
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
+        final PlatformPlayer failingPlayer = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(true), 1);
+        final PlatformPlayer healthyPlayer = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(true), 2);
+        final AtomicInteger healthyResumed = new AtomicInteger();
+
+        manager.track(failingPlayer, target -> {
+            throw new IllegalStateException("boom");
+        }).defer();
+        manager.track(healthyPlayer, target -> healthyResumed.incrementAndGet()).defer();
+
+        manager.pollOnline(List.of(failingPlayer, healthyPlayer));
+        assertEquals(1, healthyResumed.get());
+
+    }
+
+    @Test
+    void trackedRunExecutesUncontextualActionEvenWhenPlayerIsOffline() {
+
+        final List<Runnable> globalRunnables = new ArrayList<>();
+        final TaskScheduler<PlatformPlayer> scheduler = routingScheduler(globalRunnables);
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
+        final PunishmentActionRunner runner = new PunishmentActionRunner(scheduler, NOPLogger.NOP_LOGGER, manager);
+        final PlatformPlayer offlinePlayer = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(false), 1);
+        final AtomicInteger executed = new AtomicInteger();
+
+        final UncontextualAction consoleAction = new UncontextualAction() {
+
+            @Override
+            public void execute(
+                    final @Nullable String value
+            ) {
+
+                executed.incrementAndGet();
+
+            }
+
+        };
+
+        runner.runTracked(
+                offlinePlayer,
+                List.of(),
+                List.of(new ExecutableAction<>(consoleAction, "console")),
+                UnaryOperator.identity()
+        );
+
+        assertEquals(1, globalRunnables.size());
+        globalRunnables.get(0).run();
+        assertEquals(1, executed.get());
 
     }
 
@@ -169,8 +225,8 @@ final class PunishArchitectureAndInvariantLockTest {
         final AtomicBoolean taskCancelled = new AtomicBoolean();
         final List<Consumer<Task>> captured = new ArrayList<>();
         final TaskScheduler<PlatformPlayer> capturingScheduler = capturingScheduler(captured, taskCancelled);
-        final PendingActionManager manager = new PendingActionManager();
-        final PlatformPlayer player = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(true));
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
+        final PlatformPlayer player = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(true), 1);
         manager.track(player, ignored -> { });
         final VisualSequence visual = new VisualSequence(
                 5L,
@@ -181,14 +237,19 @@ final class PunishArchitectureAndInvariantLockTest {
         ) {
 
             @Override
-            protected void start(final @NotNull PlatformPlayer source) {
+            protected void start(
+                    final @NotNull PlatformPlayer source
+            ) {
 
                 throw new IllegalStateException("particle boom");
 
             }
 
             @Override
-            protected void tick(final @NotNull PlatformPlayer source, final long tick) {
+            protected void tick(
+                    final @NotNull PlatformPlayer source,
+                    final long tick
+            ) {
 
             }
 
@@ -204,17 +265,69 @@ final class PunishArchitectureAndInvariantLockTest {
     }
 
     @Test
-    void sequenceRegistryReturnsNullWhenMissing() {
+    void timedSequenceRunsWithoutExtraEmptyTick() {
+
+        final AtomicBoolean taskCancelled = new AtomicBoolean();
+        final List<Consumer<Task>> captured = new ArrayList<>();
+        final TaskScheduler<PlatformPlayer> capturingScheduler = capturingScheduler(captured, taskCancelled);
+        final PendingActionManager manager = new PendingActionManager(NOPLogger.NOP_LOGGER);
+        final PlatformPlayer player = proxyPlayer(UUID.randomUUID(), new AtomicBoolean(true), 1);
+        final List<String> events = new ArrayList<>();
+        final VisualSequence visual = new VisualSequence(
+                2L,
+                capturingScheduler,
+                lines -> new ExecutableActionList<>(List.of()),
+                new PunishmentActionRunner(capturingScheduler, NOPLogger.NOP_LOGGER, manager),
+                manager
+        ) {
+
+            @Override
+            protected void start(
+                    final @NotNull PlatformPlayer source
+            ) {
+
+                events.add("start");
+
+            }
+
+            @Override
+            protected void tick(
+                    final @NotNull PlatformPlayer source,
+                    final long tick
+            ) {
+
+                events.add("tick:" + tick);
+
+            }
+
+        };
+        visual.onReload(BasicConfigurationNode.root());
+        visual.newSession(player, (target, before) -> events.add("end")).start();
+
+        final Consumer<Task> runner = captured.get(0);
+        final Task task = dummyTask(taskCancelled);
+        runner.accept(task);
+        runner.accept(task);
+        runner.accept(task);
+
+        assertEquals(List.of("start", "tick:0", "tick:1", "end"), events);
+        assertTrue(taskCancelled.get());
+
+    }
+
+    @Test
+    void sequenceRegistryStartsEmpty() {
 
         final BuiltInSequenceRegistry<PlatformPlayer> registry = new BuiltInSequenceRegistry<>();
-        assertNull(registry.find("missing"));
+        assertNull(registry.all().get("missing"));
         assertTrue(registry.all().isEmpty());
 
     }
 
-    private static PlatformPlayer proxyPlayer(
+    private static @NotNull PlatformPlayer proxyPlayer(
             final @NotNull UUID uuid,
-            final @NotNull AtomicBoolean online
+            final @NotNull AtomicBoolean online,
+            final int entityId
     ) {
 
         return (PlatformPlayer) Proxy.newProxyInstance(
@@ -222,6 +335,7 @@ final class PunishArchitectureAndInvariantLockTest {
                 new Class<?>[] {PlatformPlayer.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "uniqueId" -> uuid;
+                    case "entityId" -> entityId;
                     case "name" -> "Player";
                     case "online" -> online.get();
                     default -> null;
@@ -230,7 +344,9 @@ final class PunishArchitectureAndInvariantLockTest {
 
     }
 
-    private static Task dummyTask(final @NotNull AtomicBoolean cancelled) {
+    private static @NotNull Task dummyTask(
+            final @NotNull AtomicBoolean cancelled
+    ) {
 
         return new Task() {
 
@@ -260,7 +376,7 @@ final class PunishArchitectureAndInvariantLockTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static TaskScheduler<PlatformPlayer> failingScheduler() {
+    private static @NotNull TaskScheduler<PlatformPlayer> failingScheduler() {
 
         return (TaskScheduler<PlatformPlayer>) Proxy.newProxyInstance(
                 TaskScheduler.class.getClassLoader(),
@@ -273,7 +389,26 @@ final class PunishArchitectureAndInvariantLockTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static TaskScheduler<PlatformPlayer> capturingScheduler(
+    private static @NotNull TaskScheduler<PlatformPlayer> routingScheduler(
+            final @NotNull List<Runnable> globalRunnables
+    ) {
+
+        return (TaskScheduler<PlatformPlayer>) Proxy.newProxyInstance(
+                TaskScheduler.class.getClassLoader(),
+                new Class<?>[] {TaskScheduler.class},
+                (proxy, method, args) -> {
+                    if ("schedule".equals(method.getName()) && args != null && args.length > 0 && args[0] instanceof Runnable runnable) {
+                        globalRunnables.add(runnable);
+                        return dummyTask(new AtomicBoolean());
+                    }
+                    throw new AssertionError("Unexpected scheduler call: " + method.getName());
+                }
+        );
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @NotNull TaskScheduler<PlatformPlayer> capturingScheduler(
             final @NotNull List<Consumer<Task>> captured,
             final @NotNull AtomicBoolean cancelled
     ) {

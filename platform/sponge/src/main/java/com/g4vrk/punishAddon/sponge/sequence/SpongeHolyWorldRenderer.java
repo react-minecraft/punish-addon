@@ -1,10 +1,9 @@
 package com.g4vrk.punishAddon.sponge.sequence;
 
 import com.g4vrk.punishAddon.sequence.builtin.renderer.HolyWorldRenderer;
-import com.g4vrk.punishAddon.sequence.builtin.renderer.ParticleFrame;
 import com.g4vrk.react.api.platform.player.PlatformPlayer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.api.effect.particle.ParticleEffect;
 import org.spongepowered.api.effect.particle.ParticleOptions;
 import org.spongepowered.api.effect.particle.ParticleTypes;
@@ -19,19 +18,27 @@ import org.spongepowered.math.vector.Vector3d;
 /**
  * Renders the HolyWorld effect through SpongeAPI on the player's server entity thread.
  */
+@ApiStatus.Internal
 public final class SpongeHolyWorldRenderer implements HolyWorldRenderer {
 
     private volatile Palette palette;
 
     @Override
-    public void configure(final int first, final int second, final float size) {
+    public void configure(
+            final int first,
+            final int second,
+            final float size
+    ) {
 
         this.palette = new Palette(particle(first, size), particle(second, size));
 
     }
 
     @Override
-    public void levitate(final @NotNull PlatformPlayer player, final long duration) {
+    public void levitate(
+            final @NotNull PlatformPlayer player,
+            final long duration
+    ) {
 
         requirePlayer(player).potionEffects().add(PotionEffect.builder()
                 .potionType(PotionEffectTypes.LEVITATION)
@@ -43,28 +50,33 @@ public final class SpongeHolyWorldRenderer implements HolyWorldRenderer {
     }
 
     @Override
-    public @Nullable ParticleFrame frame(final @NotNull PlatformPlayer player) {
+    public void dust(
+            final @NotNull PlatformPlayer player,
+            final double x,
+            final double y,
+            final double z,
+            final boolean firstColor
+    ) {
 
         final ServerPlayer target = requirePlayer(player);
         final ServerWorld world = target.world();
         final Vector3d position = target.position();
-        final double x = position.x();
-        final double y = position.y();
-        final double z = position.z();
         final Palette current = this.palette;
         if (current == null) {
             throw new IllegalStateException("HolyWorld renderer is not configured");
         }
-        return (offsetX, offsetY, offsetZ, firstColor) -> world.spawnParticles(
+        world.spawnParticles(
                 firstColor ? current.first() : current.second(),
-                x + offsetX,
-                y + offsetY,
-                z + offsetZ
+                position.x() + x,
+                position.y() + y,
+                position.z() + z
         );
 
     }
 
-    private static @NotNull ServerPlayer requirePlayer(final @NotNull PlatformPlayer player) {
+    private static @NotNull ServerPlayer requirePlayer(
+            final @NotNull PlatformPlayer player
+    ) {
 
         final ServerPlayer nativePlayer = player.unwrap(ServerPlayer.class);
         if (nativePlayer == null) {
@@ -74,7 +86,10 @@ public final class SpongeHolyWorldRenderer implements HolyWorldRenderer {
 
     }
 
-    private static @NotNull ParticleEffect particle(final int rgb, final float size) {
+    private static @NotNull ParticleEffect particle(
+            final int rgb,
+            final float size
+    ) {
 
         return ParticleEffect.builder()
                 .type(ParticleTypes.DUST.get())
@@ -84,7 +99,10 @@ public final class SpongeHolyWorldRenderer implements HolyWorldRenderer {
 
     }
 
-    private record Palette(@NotNull ParticleEffect first, @NotNull ParticleEffect second) {
+    private record Palette(
+            @NotNull ParticleEffect first,
+            @NotNull ParticleEffect second
+    ) {
 
     }
 

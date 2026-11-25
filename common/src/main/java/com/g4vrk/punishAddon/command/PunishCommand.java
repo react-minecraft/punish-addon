@@ -11,6 +11,7 @@ import org.incendo.cloud.Command;
 import org.incendo.cloud.context.CommandContext;
 import org.incendo.cloud.key.CloudKey;
 import org.incendo.cloud.parser.standard.StringParser;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -22,6 +23,7 @@ import java.util.function.BiConsumer;
  * <p>Each punishment type requires {@code react.punish.<type>}.
  * {@code [animation]} is a literal only for types with {@code need-to-select-in-command: true}.</p>
  */
+@ApiStatus.Internal
 public final class PunishCommand {
 
     public static final String TYPE_PERMISSION = "react.punish.";
