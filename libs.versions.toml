@@ -5,7 +5,7 @@ minecraft = "1.21.11"
 
 react = "df00c45"
 actions = "2.2.1"
-schedula = "2.0.0"
+schedula = "2.0.1"
 
 packetevents = "2.13.0"
 configurate = "4.2.0"
