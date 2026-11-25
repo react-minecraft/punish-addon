@@ -26,6 +26,9 @@ public abstract class TimedTickingSequence implements Sequence<PlatformPlayer> {
             final @NotNull TaskScheduler<PlatformPlayer> scheduler
     ) {
 
+        if (duration <= 0L) {
+            throw new IllegalArgumentException("Sequence duration must be positive: " + duration);
+        }
         this.duration = duration;
         this.scheduler = scheduler;
 
@@ -69,6 +72,7 @@ public abstract class TimedTickingSequence implements Sequence<PlatformPlayer> {
                             onEnd.run();
                         }
                     } catch (final RuntimeException | Error failure) {
+                        current.cancel();
                         if (player.online()) {
                             action.complete(player);
                         } else {

@@ -6,6 +6,9 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiConsumer;
 
+/**
+ * Named punishment animation factory for a target source type.
+ */
 public interface Sequence<S> {
 
     @NotNull SequenceSession newSession(

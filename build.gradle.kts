@@ -98,7 +98,7 @@ subprojects {
             archiveFileName = "punish-addon-${project.version}.jar"
             archiveClassifier = ""
 
-            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
 
             mergeServiceFiles()
 

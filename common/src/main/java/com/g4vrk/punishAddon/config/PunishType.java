@@ -10,6 +10,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Configured punishment type binding animations and actions.
+ */
 public record PunishType(
         @NotNull Map<String, Sequence<PlatformPlayer>> animations,
         @NotNull AnimationConfig animation,

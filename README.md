@@ -67,13 +67,22 @@ types:
 
 ## Сборка
 
-Для сборки нужен JDK 21.
+Для сборки всех платформ нужен JDK 25.
 
 ```bash
 ./gradlew build
 ```
 
-Готовый jar лежит в `common/build/libs/`.
+Собирайте вариант под целевой сервер:
+
+- `:platform:bukkit:shadowJar` — Bukkit/Paper/Folia; Paper API 1.16.5 и bytecode Java 16.
+- `:platform:fabric:shadowJar` — Fabric 26.2 и Java 25.
+- `:platform:sponge:shadowJar` — SpongeAPI 17 и Java 21.
+- `:platform:minestom:shadowJar` — Minestom 26.2 и Java 25.
+
+Платформенные JAR находятся в соответствующих `platform/<name>/build/libs/`. `common/build/libs/` содержит только общую часть аддона.
+
+Для запуска именно на JVM 16 также нужен React API с bytecode Java 16 или ниже. Текущий JitPack API собран для Java 17, поэтому эту комбинацию нельзя считать проверенной на JVM 16.
 
 ## Лицензия
 

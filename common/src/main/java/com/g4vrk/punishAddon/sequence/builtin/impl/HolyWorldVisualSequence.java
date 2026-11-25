@@ -9,7 +9,9 @@ import com.g4vrk.react.api.platform.player.PlatformPlayer;
 import com.g4vrk.schedula.task.scheduler.TaskScheduler;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.Color;
+import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 import org.jetbrains.annotations.NotNull;
@@ -175,8 +177,15 @@ public final class HolyWorldVisualSequence extends VisualSequence {
             final long tick
     ) {
 
+        if (DUST == null) {
+            return;
+        }
         final Player player = requireBukkitPlayer(platformPlayer);
-        final var center = player.getLocation();
+        final Location center = player.getLocation();
+        final World world = center.getWorld();
+        if (world == null) {
+            return;
+        }
 
         final double centerX =
                 center.getX();
@@ -247,7 +256,7 @@ public final class HolyWorldVisualSequence extends VisualSequence {
                     -rotatedX * rotationSin
                             + localZ * rotationCos;
 
-            player.getWorld().spawnParticle(
+            world.spawnParticle(
                     DUST,
 
                     centerX

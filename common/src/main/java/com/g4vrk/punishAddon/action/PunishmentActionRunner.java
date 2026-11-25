@@ -79,7 +79,7 @@ public final class PunishmentActionRunner {
 
         private synchronized void resume(final @NotNull PlatformPlayer player) {
 
-            final PendingActionManager.Action action = pending.track(player.uniqueId(), this::resume);
+            final PendingActionManager.Action action = pending.track(player, this::resume);
             this.pendingAction = action;
             try {
                 action.attach(scheduler.scheduleEntity(player, () -> advance(player, action, false), NEXT_TICK));

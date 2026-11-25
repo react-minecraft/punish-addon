@@ -9,6 +9,7 @@ import com.g4vrk.punishAddon.config.PunishType;
 import com.g4vrk.punishAddon.sequence.PendingActionManager;
 import com.g4vrk.punishAddon.sequence.Sequence;
 import com.g4vrk.punishAddon.sequence.builtin.BuiltInSequenceBootstrap;
+import com.g4vrk.punishAddon.sequence.builtin.renderer.HolyWorldRenderer;
 import com.g4vrk.react.api.addon.JavaAddon;
 import com.g4vrk.react.api.config.migration.ConfigMigrationChain;
 import com.g4vrk.react.api.event.bus.Subscribe;
@@ -27,8 +28,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.function.UnaryOperator;
+import java.util.ServiceLoader;
 
 /**
  * Punishes players with a command and plays an animation over them first.
@@ -62,11 +64,10 @@ public final class ReactPunishAddon extends JavaAddon {
 
         this.actionRunner = new PunishmentActionRunner(environment().scheduler(), logger(), this.pending);
         load();
-        this.reconnectMonitor = environment().scheduler().schedule(() -> {
-            for (final PlatformPlayer player : environment().platform().onlinePlayers()) {
-                this.pending.thenJoin(player);
-            }
-        }, TickSchedule.repeating(20, 20));
+        this.reconnectMonitor = environment().scheduler().schedule(
+                () -> this.pending.pollOnline(environment().platform().onlinePlayers()),
+                TickSchedule.repeating(20, 20)
+        );
         registerCommand();
 
         logger().info("Punish types: {}, command /react {}", this.types.keySet(), this.label);
@@ -124,19 +125,7 @@ public final class ReactPunishAddon extends JavaAddon {
 
         if (sequence == null) {
             logger().warn("Animation '{}' is unavailable, punishing {} without it", context.animation(), player.name());
-            final PendingActionManager.Action action = pending.track(player.uniqueId(), target -> execute(target, context, List.of()));
-            try {
-                action.attach(environment().scheduler().scheduleEntity(player, () -> {
-                    if (player.online()) {
-                        action.complete(player);
-                    } else {
-                        action.defer();
-                    }
-                }, TickSchedule.instant()));
-            } catch (final RuntimeException | Error failure) {
-                action.discard();
-                throw failure;
-            }
+            execute(player, context, List.of());
             return;
         }
 
@@ -150,17 +139,54 @@ public final class ReactPunishAddon extends JavaAddon {
             final @NotNull Iterable<? extends ExecutableAction<? super Audience>> before
     ) {
 
-        final String name = player.name();
-        final String uuid = player.uniqueId().toString();
-        final String reason = context.reason();
+        final Map<String, String> placeholders = Map.of(
+                "{player.name}", player.name(),
+                "{player.uuid}", player.uniqueId().toString(),
+                "{context.input-after-type}", context.reason(),
+                "{reason}", context.reason()
+        );
 
-        final UnaryOperator<String> placeholders = input -> input == null ? null : input
-                .replace("{player.name}", name)
-                .replace("{player.uuid}", uuid)
-                .replace("{context.input-after-type}", reason)
-                .replace("{reason}", reason);
+        actionRunner.runTracked(
+                player,
+                before,
+                context.punishType().actions(),
+                input -> replacePlaceholders(input, placeholders)
+        );
 
-        actionRunner.runTracked(player, before, context.punishType().actions(), placeholders);
+    }
+
+    private static String replacePlaceholders(
+            final String input,
+            final @NotNull Map<String, String> placeholders
+    ) {
+
+        if (input == null || input.indexOf('{') < 0) {
+            return input;
+        }
+        final StringBuilder result = new StringBuilder(input.length() + 16);
+        int cursor = 0;
+        while (cursor < input.length()) {
+            final int open = input.indexOf('{', cursor);
+            if (open < 0) {
+                result.append(input, cursor, input.length());
+                break;
+            }
+            final int close = input.indexOf('}', open + 1);
+            if (close < 0) {
+                result.append(input, cursor, input.length());
+                break;
+            }
+            final String replacement = placeholders.get(input.substring(open, close + 1));
+            if (replacement != null) {
+                result.append(input, cursor, open);
+                result.append(replacement);
+                cursor = close + 1;
+            } else {
+                result.append(input, cursor, open + 1);
+                cursor = open + 1;
+            }
+        }
+        return result.toString();
 
     }
 
@@ -171,13 +197,24 @@ public final class ReactPunishAddon extends JavaAddon {
         final ActionParser<Audience> parser = environment().actions();
 
         final String platformName = environment().platform().platformName();
-        final boolean supportsHolyWorld = platformName.equals("paper") || platformName.equals("bukkit");
-        if (!supportsHolyWorld) {
-            logger().warn("The HolyWorld animation is unavailable on {}; punishments will run without its visual effects", environment().platform().platformName());
+        final Iterator<HolyWorldRenderer> renderers = ServiceLoader.load(
+                HolyWorldRenderer.class,
+                getClass().getClassLoader()
+        ).iterator();
+        if (!renderers.hasNext()) {
+            throw new IllegalStateException(
+                    "No HolyWorld renderer is installed for platform '" + platformName + "'"
+            );
         }
-        final Map<String, Sequence<PlatformPlayer>> animations = supportsHolyWorld
-                ? BuiltInSequenceBootstrap.bootstrap(environment().scheduler(), parser, actionRunner, pending, holyWorld)
-                : Map.of();
+        final HolyWorldRenderer renderer = renderers.next();
+        if (renderers.hasNext()) {
+            throw new IllegalStateException(
+                    "Multiple HolyWorld renderers are installed for platform '" + platformName + "'"
+            );
+        }
+        final Map<String, Sequence<PlatformPlayer>> animations = BuiltInSequenceBootstrap.bootstrap(
+                environment().scheduler(), parser, actionRunner, pending, holyWorld, renderer
+        );
 
         final ConfigurationNode settings = main.node("settings");
         /*

@@ -21,4 +21,12 @@ dependencies {
     compileOnly(libs.configurate.yaml)
     compileOnly(libs.packetevents)
 
+    testImplementation(libs.paper.api)
+    testImplementation(libs.react.api)
+    testImplementation(libs.actions)
+    testImplementation(libs.schedula.common)
+    testImplementation(libs.configurate.yaml)
+    testImplementation(libs.packetevents)
+    testImplementation("org.slf4j:slf4j-api:2.0.16")
+
 }

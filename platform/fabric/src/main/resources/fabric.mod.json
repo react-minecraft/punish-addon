@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "react_punish_addon",
+  "version": "${version}",
+  "name": "React Punish Addon",
+  "description": "Punishment animations for React",
+  "environment": "server",
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "react": "2.x"
+  }
+}

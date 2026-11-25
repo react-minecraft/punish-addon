@@ -1,16 +1,21 @@
 package com.g4vrk.punishAddon.sequence.builtin;
 
 import com.g4vrk.punishAddon.sequence.Sequence;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Registry of built-in punishment sequences shipped with the addon.
+ */
 public class BuiltInSequenceRegistry<S> {
 
-    private final Map<String, Sequence<S>> builtIn = new Object2ObjectOpenHashMap<>();
+    private final Map<String, Sequence<S>> builtIn = new LinkedHashMap<>();
 
     public BuiltInSequenceRegistry() {
+
     }
 
     void register(
@@ -30,7 +35,7 @@ public class BuiltInSequenceRegistry<S> {
 
     }
 
-    public @NotNull Sequence<S> get(
+    public @Nullable Sequence<S> find(
             final @NotNull String id
     ) {
 
@@ -40,9 +45,8 @@ public class BuiltInSequenceRegistry<S> {
 
     public @NotNull Map<String, Sequence<S>> all() {
 
-        return new Object2ObjectOpenHashMap<>(builtIn);
+        return Map.copyOf(builtIn);
 
     }
-
 
 }

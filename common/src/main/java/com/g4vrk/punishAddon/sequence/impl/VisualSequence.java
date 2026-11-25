@@ -60,7 +60,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                             config.node(
                                     "actions",
                                     "on-start"
-                            ).getList(String.class)
+                            ).getList(String.class, List.of())
                     );
 
             this.thenTick = actionParser
@@ -68,7 +68,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                             config.node(
                                     "actions",
                                     "then-tick"
-                            ).getList(String.class)
+                            ).getList(String.class, List.of())
                     );
 
             this.atEnd = actionParser
@@ -76,7 +76,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
                             config.node(
                                     "actions",
                                     "finally"
-                            ).getList(String.class)
+                            ).getList(String.class, List.of())
                     );
 
         } catch (final SerializationException ex) {
@@ -95,7 +95,7 @@ public abstract class VisualSequence extends TimedTickingSequence implements Rel
 
         return new DelegateSequenceSession(() -> {
             final Consumer<PlatformPlayer> completion = target -> onEnd.accept(target, atEnd);
-            final PendingActionManager.Action action = pending.track(source.uniqueId(), completion);
+            final PendingActionManager.Action action = pending.track(source, completion);
             scheduleVisualSequence(
                     source,
                     action,

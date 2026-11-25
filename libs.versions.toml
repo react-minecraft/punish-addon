@@ -1,7 +1,12 @@
 [versions]
 
-paper-api = "1.18.2-R0.1-SNAPSHOT"
-minecraft = "1.21.11"
+paper-api = "1.16.5-R0.1-SNAPSHOT"
+minecraft = "26.2"
+minestom = "2026.10.07-26.2"
+fabric-loom = "1.16.2"
+fabric-api = "0.161.0+26.2"
+fabric-loader = "0.19.3"
+sponge-api = "17.0.0"
 
 react = "df00c45"
 actions = "2.2.1"
@@ -10,6 +15,7 @@ schedula = "2.0.1"
 packetevents = "2.13.0"
 configurate = "4.2.0"
 cloud-paper = "2.0.0"
+adventure = "5.2.0"
 
 junit = "6.1.3"
 junit-platform = "6.1.3"
@@ -22,7 +28,11 @@ run-task = "3.0.2"
 [libraries]
 xseries = { module = "com.github.cryptomorin:XSeries", version = "14.0.0" }
 
-paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+paper-api = { module = "com.destroystokyo.paper:paper-api", version.ref = "paper-api" }
+minestom = { module = "net.minestom:minestom", version.ref = "minestom" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
+sponge-api = { module = "org.spongepowered:spongeapi", version.ref = "sponge-api" }
 
 react-api = { module = "com.github.react-minecraft.plugin:react-api", version.ref = "react" }
 react-common = { module = "com.github.react-minecraft.plugin:react-common", version.ref = "react" }
@@ -32,6 +42,7 @@ schedula-common = { module = "com.github.g4vrk.Schedula:common", version.ref = "
 packetevents = { module = "com.github.retrooper:packetevents-spigot", version.ref = "packetevents" }
 configurate-yaml = { module = "org.spongepowered:configurate-yaml", version.ref = "configurate" }
 cloud-paper = { module = "org.incendo:cloud-paper", version.ref = "cloud-paper" }
+adventure-api = { module = "net.kyori:adventure-api", version.ref = "adventure" }
 
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
@@ -43,3 +54,4 @@ lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-task" }
+fabric-loom = { id = "net.fabricmc.fabric-loom", version.ref = "fabric-loom" }
