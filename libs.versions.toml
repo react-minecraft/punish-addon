@@ -9,7 +9,7 @@ fabric-loader = "0.19.3"
 sponge-api = "17.0.0"
 
 react = "df00c45"
-actions = "2.2.1"
+actions = "2.2.2"
 schedula = "2.0.1"
 
 packetevents = "2.13.0"
