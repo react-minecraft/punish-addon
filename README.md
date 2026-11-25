@@ -61,9 +61,9 @@ types:
 
 ## Установка
 
-1. Соберите аддон или скачайте jar из [GitHub Releases](https://github.com/react-minecraft/punish-addon/releases/latest). Нужен React с API 2.
-2. Положите `punish-addon-<версия>.jar` в `plugins/React/addons/`.
-3. Перезапустите сервер или выполните `/react reboot addons`. Конфиг появится в `plugins/React/addons/punish-addon/`.
+1. Соберите аддон или скачайте подходящий JAR из [GitHub Releases](https://github.com/react-minecraft/punish-addon/releases/latest). Нужен React с API 2.
+2. Выберите вариант под свою платформу (`ReactPunishAddon-<платформа>-<версия>.jar`: `bukkit`, `fabric`, `minestom`, `sponge`) и положите его в каталог аддонов React (`plugins/React/addons/` для Paper/Spigot/Folia, `config/react/addons/` для Fabric).
+3. Перезапустите сервер или выполните `/react reboot addons`. Конфиг появится в каталоге данных аддона (`plugins/React/addons/punish-addon/`).
 
 ## Сборка
 
